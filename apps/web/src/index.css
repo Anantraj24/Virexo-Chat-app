@@ -1,7 +1,54 @@
 @import "tailwindcss";
 
 @layer base {
+  :root {
+    --color-bg: #09090b;
+    --color-card: #18181b;
+    --color-border: #27272a;
+    --color-text: #f4f4f5;
+  }
+
+  html.light {
+    --color-bg: #f4f4f5;
+    --color-card: #ffffff;
+    --color-border: #e4e4e7;
+    --color-text: #09090b;
+  }
+
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+  }
+}
+
+/* Custom Minimal Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Reduced Motion Compliance */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
