@@ -9,6 +9,7 @@ import { requestIdMiddleware } from './middleware/requestId.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { NotFoundError } from './utils/errors.js';
 import { logger } from './utils/logger.js';
+import authRoutes from './routes/authRoutes.js';
 
 // Validate environment on boot
 validateEnv();
@@ -77,6 +78,9 @@ app.get('/ready', (req, res) => {
   }
 });
 
+// API v1 Routes
+app.use('/api/v1/auth', authRoutes);
+
 // Root Info Endpoint
 app.get('/', (req, res) => {
   res.status(200).json(
@@ -85,6 +89,7 @@ app.get('/', (req, res) => {
       version: APP_VERSION,
       health: '/health',
       readiness: '/ready',
+      auth: '/api/v1/auth',
     })
   );
 });
