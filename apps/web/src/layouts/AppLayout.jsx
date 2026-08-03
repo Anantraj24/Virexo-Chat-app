@@ -1,6 +1,9 @@
-import { Outlet, NavLink, Link } from 'react-router-dom';
+import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import { APP_NAME } from '@virexo/shared';
 import { usePreferencesStore } from '../store/usePreferencesStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { useToast } from '../components/ui/Toast';
+import { logoutRequest, logoutAllRequest, resendVerificationRequest } from '../api/authApi';
 import { Avatar } from '../components/ui/Avatar';
 import { Dropdown } from '../components/ui/Dropdown';
 import {
@@ -17,10 +20,53 @@ import {
   Bell,
   LogOut,
   ShieldAlert,
+  AlertTriangle,
+  Mail,
 } from 'lucide-react';
+import { useState } from 'react';
 
 export function AppLayout() {
   const { theme, setTheme, sidebarOpen, toggleSidebar, setSidebarOpen } = usePreferencesStore();
+  const { user, clearAuth } = useAuthStore();
+  const { addToast } = useToast();
+  const navigate = useNavigate();
+  const [resendingEmail, setResendingEmail] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await logoutRequest();
+    } catch {
+      // Ignore network errors on logout
+    } finally {
+      clearAuth();
+      addToast({ message: 'Signed out successfully', type: 'info' });
+      navigate('/login', { replace: true });
+    }
+  };
+
+  const handleLogoutAll = async () => {
+    try {
+      await logoutAllRequest();
+      addToast({ message: 'Signed out of all active sessions', type: 'info' });
+    } catch (err) {
+      addToast({ message: err.message || 'Failed to logout of all sessions', type: 'error' });
+    } finally {
+      clearAuth();
+      navigate('/login', { replace: true });
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setResendingEmail(true);
+    try {
+      await resendVerificationRequest();
+      addToast({ message: 'Verification email sent! Check your inbox.', type: 'success' });
+    } catch (err) {
+      addToast({ message: err.message || 'Failed to send verification email', type: 'error' });
+    } finally {
+      setResendingEmail(false);
+    }
+  };
 
   const themeItems = [
     { label: 'Light Mode', icon: <Sun className="w-3.5 h-3.5" />, onClick: () => setTheme('light') },
@@ -29,10 +75,13 @@ export function AppLayout() {
   ];
 
   const userMenuItems = [
-    { label: 'Settings', icon: <Settings className="w-3.5 h-3.5" />, onClick: () => {} },
-    { label: 'Admin Dashboard', icon: <ShieldAlert className="w-3.5 h-3.5" />, onClick: () => {} },
+    { label: 'Settings', icon: <Settings className="w-3.5 h-3.5" />, onClick: () => navigate('/settings') },
+    ...(user?.role === 'admin'
+      ? [{ label: 'Admin Dashboard', icon: <ShieldAlert className="w-3.5 h-3.5" />, onClick: () => {} }]
+      : []),
     { divider: true },
-    { label: 'Sign Out', icon: <LogOut className="w-3.5 h-3.5" />, danger: true, onClick: () => {} },
+    { label: 'Sign Out All Devices', icon: <LogOut className="w-3.5 h-3.5" />, danger: true, onClick: handleLogoutAll },
+    { label: 'Sign Out', icon: <LogOut className="w-3.5 h-3.5" />, danger: true, onClick: handleLogout },
   ];
 
   const mockChannels = [
@@ -145,13 +194,13 @@ export function AppLayout() {
         <div className="p-3 border-t border-zinc-800/80 bg-zinc-950/60 shrink-0 flex items-center justify-between">
           <Dropdown
             trigger={
-              <div className="flex items-center space-x-2.5 p-1 rounded-lg hover:bg-zinc-800/60 transition group text-left">
-                <Avatar name="Senior Engineer" status="online" size="sm" />
+              <div className="flex items-center space-x-2.5 p-1 rounded-lg hover:bg-zinc-800/60 transition group text-left cursor-pointer">
+                <Avatar name={user?.username || 'User'} status={user?.status || 'online'} size="sm" src={user?.avatarUrl} />
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-semibold text-zinc-200 truncate group-hover:text-white">
-                    Senior Engineer
+                    {user?.username || 'User'}
                   </div>
-                  <div className="text-[10px] text-zinc-400 truncate">@senioreng</div>
+                  <div className="text-[10px] text-zinc-400 truncate">{user?.email || ''}</div>
                 </div>
               </div>
             }
@@ -182,6 +231,24 @@ export function AppLayout() {
 
       {/* Main App Content View */}
       <div className="flex-1 flex flex-col min-w-0 bg-zinc-950">
+        {/* Email Verification Banner */}
+        {user && !user.isEmailVerified && (
+          <div className="bg-amber-950/60 border-b border-amber-800/60 px-4 py-2 flex items-center justify-between text-xs text-amber-200">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Please verify your email address to unlock full features.</span>
+            </div>
+            <button
+              onClick={handleResendVerification}
+              disabled={resendingEmail}
+              className="text-amber-400 hover:text-amber-300 font-semibold underline flex items-center space-x-1 cursor-pointer disabled:opacity-50"
+            >
+              <Mail className="w-3.5 h-3.5 inline mr-1" />
+              <span>{resendingEmail ? 'Sending...' : 'Resend Email'}</span>
+            </button>
+          </div>
+        )}
+
         {/* Main App Top Header */}
         <header className="h-14 px-4 border-b border-zinc-800/80 bg-zinc-900/40 flex items-center justify-between shrink-0">
           <div className="flex items-center space-x-3">

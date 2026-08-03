@@ -1,24 +1,61 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Mail, Lock, User, UserPlus } from 'lucide-react';
 import { useToast } from '../components/ui/Toast';
+import { signupRequest } from '../api/authApi';
+import { useAuthStore } from '../store/useAuthStore';
+import { validateUsername, validateEmail, validatePassword } from '../lib/validation';
 
 export function RegisterPage() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState({});
+  const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { addToast } = useToast();
 
-  const handleSubmit = (e) => {
+  const navigate = useNavigate();
+  const { addToast } = useToast();
+  const setAuth = useAuthStore((state) => state.setAuth);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setServerError('');
+
+    const usernameErr = validateUsername(username);
+    const emailErr = validateEmail(email);
+    const passwordErr = validatePassword(password);
+
+    if (usernameErr || emailErr || passwordErr) {
+      setErrors({
+        username: usernameErr,
+        email: emailErr,
+        password: passwordErr,
+      });
+      return;
+    }
+
+    setErrors({});
     setLoading(true);
-    setTimeout(() => {
+
+    try {
+      const response = await signupRequest({ username, email, password });
+      const { user, accessToken } = response.data;
+
+      setAuth(user, accessToken);
+      addToast({
+        message: 'Account created! Please check your email to verify your account.',
+        type: 'success',
+        duration: 6000,
+      });
+      navigate('/', { replace: true });
+    } catch (err) {
+      setServerError(err.message || 'Registration failed. Please try again.');
+    } finally {
       setLoading(false);
-      addToast({ message: 'Authentication registration will be connected in Phase 4!', type: 'info' });
-    }, 1000);
+    }
   };
 
   return (
@@ -29,13 +66,24 @@ export function RegisterPage() {
           <p className="text-xs text-zinc-400 mt-1">Join the Virexo real-time chat platform</p>
         </div>
 
+        {serverError && (
+          <div className="p-3.5 rounded-xl border border-red-800/60 bg-red-950/80 text-red-200 text-xs font-medium">
+            {serverError}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="Username"
             placeholder="alex_rivera"
             leftIcon={<User className="w-4 h-4" />}
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={(e) => {
+              setUsername(e.target.value);
+              if (errors.username) setErrors((prev) => ({ ...prev, username: null }));
+            }}
+            error={errors.username}
+            helperText="Letters, numbers, and underscores only (3-30 chars)"
             required
           />
 
@@ -45,7 +93,11 @@ export function RegisterPage() {
             placeholder="alex@example.com"
             leftIcon={<Mail className="w-4 h-4" />}
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (errors.email) setErrors((prev) => ({ ...prev, email: null }));
+            }}
+            error={errors.email}
             required
           />
 
@@ -55,11 +107,23 @@ export function RegisterPage() {
             placeholder="••••••••"
             leftIcon={<Lock className="w-4 h-4" />}
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (errors.password) setErrors((prev) => ({ ...prev, password: null }));
+            }}
+            error={errors.password}
+            helperText="At least 8 characters and 1 number"
             required
           />
 
-          <Button type="submit" variant="primary" fullWidth size="lg" isLoading={loading} leftIcon={<UserPlus className="w-4 h-4" />}>
+          <Button
+            type="submit"
+            variant="primary"
+            fullWidth
+            size="lg"
+            isLoading={loading}
+            leftIcon={<UserPlus className="w-4 h-4" />}
+          >
             Create Account
           </Button>
         </form>
