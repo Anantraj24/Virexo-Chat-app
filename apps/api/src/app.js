@@ -12,6 +12,7 @@ import { logger } from './utils/logger.js';
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import conversationRoutes from './routes/conversationRoutes.js';
+import messageRoutes from './routes/messageRoutes.js';
 
 // Validate environment on boot
 validateEnv();
@@ -84,6 +85,7 @@ app.get('/ready', (req, res) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/conversations', conversationRoutes);
+app.use('/api/v1/messages', messageRoutes);
 
 // Root Info Endpoint
 app.get('/', (req, res) => {
@@ -96,6 +98,7 @@ app.get('/', (req, res) => {
       auth: '/api/v1/auth',
       users: '/api/v1/users',
       conversations: '/api/v1/conversations',
+      messages: '/api/v1/messages',
     })
   );
 });

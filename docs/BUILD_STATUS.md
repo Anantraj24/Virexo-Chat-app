@@ -1,8 +1,8 @@
 # Virexo Build Status & Progress Tracker
 
 ## 1. Executive Status Summary
-- **Current Phase**: **Phase 8 - Conversation Domain**
-- **Overall Status**: Direct DM uniqueness, group channels, cursor pagination, role-based authorization, member role management, ownership transfer, and frontend modals/sidebar integration implemented, tested & verified
+- **Current Phase**: **Phase 9 - Message REST Domain**
+- **Overall Status**: Mongoose Message model with compound indexes, text messaging, server-generated IDs, conversation authorization, idempotency key deduplication, cursor-based reverse chronological pagination, unread count calculations, lastMessageId projections, soft deletion, and live Channel/DM UI timelines implemented, tested & verified
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -19,7 +19,7 @@
 | **Phase 6** | **Authentication Frontend** | Login, signup, remember me, verify-email result, resend verification, forgot password, reset password, ProtectedRoute, GuestRoute, in-memory tokens, silent refresh, Axios 401 refresh dedup, logout & logout-all UI, Vitest web tests | **COMPLETE** |
 | **Phase 7** | **User Profile, Privacy & Preferences** | User schema extensions (displayName, bio, lastSeen, privacySettings, notificationSettings), profile update APIs, username availability check, search-safe user search, multi-tab SettingsPage, local FileReader avatar preview, UserProfileModal | **COMPLETE** |
 | **Phase 8** | **Conversation Domain** | Mongoose Conversation model with embedded members, directKey uniqueness, group creation, cursor pagination, role-based authorization (owner/admin/member), member management, role promotion/demotion, ownership transfer, leaving group, conversationApi, sidebar live channel/DM rendering, NewDMModal, CreateGroupModal, GroupSettingsModal | **COMPLETE** |
-| **Phase 9** | REST API & Upload Processing | Express controllers, validators, Cloudinary memory streaming, pagination endpoints | Pending |
+| **Phase 9** | **Message REST Domain** | Mongoose Message model with compound indexes & idempotencyKey sparse index, text message creation, server-generated IDs, conversation membership authorization, duplicate-request idempotency deduplication, cursor-based reverse chronological history pagination, unread count calculations, conversation lastMessageId projection, soft deletion foundation, messageApi, interactive ChannelPage & DirectMessagePage chat timelines, optimistic message appending, scroll-to-bottom, load earlier messages pagination | **COMPLETE** |
 | **Phase 10** | Real-Time Engine (Socket.IO) | Socket handshake auth, events (`message:send`, `typing`, `presence`), room handlers | Pending |
 | **Phase 11** | Testing, Polish & Free-Tier Deployment | Vitest, RTL, Supertest, Playwright E2E, Vercel & Render deployment pipelines | Pending |
 
@@ -48,8 +48,6 @@
 - [x] Mongoose `User` model with `refreshTokenHashes` array, unique email/username indexes, and `toJSON()` password/token omission (`apps/api/src/models/User.js`).
 - [x] Bcrypt password hashing (cost factor 12) & SHA-256 refresh token hashing (`apps/api/src/utils/token.js`).
 - [x] Short-lived JWT access tokens (15m) and rotating refresh tokens with unique UUID `jti` payloads.
-- [x] Endpoints: `POST /signup`, `POST /login` (rememberMe support), `POST /refresh`, `POST /logout`, `POST /logout-all`, `GET /me`.
-- [x] Security features: HttpOnly SameSite=Strict cookies, token reuse detection (revokes all family sessions upon replay attack), generic auth errors.
 
 ### Phase 5: Email Verification & Password Recovery
 - [x] Provider-independent email service with adapter pattern (`apps/api/src/services/emailService.js`).
@@ -66,22 +64,20 @@
 - [x] Profile, privacy, notification update APIs, username check, search-safe user query.
 
 ### Phase 8: Conversation Domain
-- [x] Mongoose Conversation model with embedded `members` sub-document array (`userId`, `role`: owner/admin/member, `joinedAt`, `lastReadAt`).
-- [x] Direct conversation uniqueness via `directKey` (`[idA, idB].sort().join('_')`). Re-requesting DM returns existing conversation without duplicates.
-- [x] Endpoints under `/api/v1/conversations`:
-  - `POST /direct` — create/retrieve 1-on-1 DM
-  - `POST /group` — create multi-user group channel (sets creator as owner)
-  - `GET /` — cursor-paginated active conversations list sorted by recency
-  - `GET /:id` — conversation details (requires membership)
-  - `PATCH /:id` — edit group details (requires owner/admin)
-  - `POST /:id/members` — add group members (requires owner/admin)
-  - `DELETE /:id/members/:userId` — remove member (requires owner/admin or self)
-  - `PATCH /:id/members/:userId/role` — promote/demote admin role (requires owner)
-  - `POST /:id/leave` — leave group with automatic owner fallback succession
-  - `POST /:id/transfer-ownership` — transfer owner role to another member
-- [x] `conversationValidators.js` — input validation rules.
-- [x] `conversationApi.js` — Axios wrapper module.
-- [x] `AppLayout.jsx` updated to render dynamic backend channels & DMs in sidebar.
-- [x] UI Modals: `NewDMModal.jsx` (live user search), `CreateGroupModal.jsx` (group channel creation), `GroupSettingsModal.jsx` (role management & group settings).
-- [x] All 63 tests passing across monorepo (40 backend integration + 23 frontend unit).
+- [x] Mongoose Conversation model with embedded `members` sub-document array.
+- [x] Direct conversation uniqueness via `directKey` (`[idA, idB].sort().join('_')`).
+- [x] Group channel creation, member role management (owner/admin/member), role promotion/demotion, ownership transfer, leaving group.
+
+### Phase 9: Message REST Domain
+- [x] Mongoose Message model (`conversationId`, `senderId`, `content`, `attachments`, `idempotencyKey`, `reactions`, `readBy`, `isEdited`, `isDeleted`).
+- [x] Compound index `{ conversationId: 1, createdAt: -1 }` for reverse-chronological pagination.
+- [x] Endpoints under `/api/v1/messages`:
+  - `POST /` — create message (validates conversation membership, checks `idempotencyKey` deduplication, updates conversation `lastMessageId` and sender `lastReadAt`, returns populated message DTO)
+  - `GET /conversation/:conversationId` — cursor-based history pagination (`createdAt < cursor`, stable reverse chronological ordering, calculates `unreadCount`)
+  - `POST /conversation/:conversationId/read` — marks conversation read, updates member `lastReadAt` and message `readBy` arrays
+  - `DELETE /:id` — soft deletion (sets `isDeleted: true`, replaces content with `"[This message was deleted]"` and clears attachments)
+- [x] `messageValidators.js` — input validation rules.
+- [x] `messageApi.js` — Axios wrapper module.
+- [x] `ChannelPage.jsx` & `DirectMessagePage.jsx` connected to real message REST API with live timeline display, enter-key message submission, optimistic appending, scroll-to-bottom, load earlier messages pagination, and soft deletion.
+- [x] All 70 tests passing across monorepo (44 backend integration + 26 frontend unit).
 - [x] ESLint passing clean (0 errors, 0 warnings) and production build succeeded.
