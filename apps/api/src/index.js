@@ -1,13 +1,15 @@
+import http from 'http';
 import app from './app.js';
 import { env } from './config/env.js';
 import { connectDB, disconnectDB } from './config/db.js';
 import { logger } from './utils/logger.js';
+import { initSocketServer } from './socket/socketServer.js';
 
-let server;
+let httpServer;
 
 async function startServer() {
   try {
-    // Attempt DB connection in non-test mode (fails gracefully if DB offline during dev)
+    // Attempt DB connection in non-test mode
     if (!env.isTest) {
       try {
         await connectDB();
@@ -16,7 +18,12 @@ async function startServer() {
       }
     }
 
-    server = app.listen(env.PORT, () => {
+    httpServer = http.createServer(app);
+
+    // Initialize Socket.IO Server
+    initSocketServer(httpServer);
+
+    httpServer.listen(env.PORT, () => {
       logger.info(`[Virexo API] Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
     });
   } catch (err) {
@@ -29,9 +36,9 @@ async function startServer() {
 async function gracefulShutdown(signal) {
   logger.info(`[Shutdown] ${signal} signal received. Closing server gracefully...`);
 
-  if (server) {
-    server.close(async () => {
-      logger.info('[Shutdown] HTTP server closed.');
+  if (httpServer) {
+    httpServer.close(async () => {
+      logger.info('[Shutdown] HTTP & Socket.IO server closed.');
       await disconnectDB();
       logger.info('[Shutdown] Cleanup complete. Exiting process.');
       process.exit(0);
@@ -64,5 +71,5 @@ if (!env.isTest) {
   });
 }
 
-export { app, server };
+export { app, httpServer };
 export default app;

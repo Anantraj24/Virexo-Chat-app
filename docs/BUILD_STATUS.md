@@ -1,8 +1,8 @@
 # Virexo Build Status & Progress Tracker
 
 ## 1. Executive Status Summary
-- **Current Phase**: **Phase 9 - Message REST Domain**
-- **Overall Status**: Mongoose Message model with compound indexes, text messaging, server-generated IDs, conversation authorization, idempotency key deduplication, cursor-based reverse chronological pagination, unread count calculations, lastMessageId projections, soft deletion, and live Channel/DM UI timelines implemented, tested & verified
+- **Current Phase**: **Phase 10 - Socket.IO Foundation and Presence**
+- **Overall Status**: Socket.IO server bootstrap, JWT handshake authentication middleware, user & conversation room management, multi-tab connection counting with 30s DB write throttling, typing start/stop with auto-expiry timers, explicit event contracts in `@virexo/shared`, single Render instance isolation with documented Redis adapter boundary, frontend socket client manager, Zustand socket store, and unit/integration test suites implemented, verified & passing.
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -20,7 +20,7 @@
 | **Phase 7** | **User Profile, Privacy & Preferences** | User schema extensions (displayName, bio, lastSeen, privacySettings, notificationSettings), profile update APIs, username availability check, search-safe user search, multi-tab SettingsPage, local FileReader avatar preview, UserProfileModal | **COMPLETE** |
 | **Phase 8** | **Conversation Domain** | Mongoose Conversation model with embedded members, directKey uniqueness, group creation, cursor pagination, role-based authorization (owner/admin/member), member management, role promotion/demotion, ownership transfer, leaving group, conversationApi, sidebar live channel/DM rendering, NewDMModal, CreateGroupModal, GroupSettingsModal | **COMPLETE** |
 | **Phase 9** | **Message REST Domain** | Mongoose Message model with compound indexes & idempotencyKey sparse index, text message creation, server-generated IDs, conversation membership authorization, duplicate-request idempotency deduplication, cursor-based reverse chronological history pagination, unread count calculations, conversation lastMessageId projection, soft deletion foundation, messageApi, interactive ChannelPage & DirectMessagePage chat timelines, optimistic message appending, scroll-to-bottom, load earlier messages pagination | **COMPLETE** |
-| **Phase 10** | Real-Time Engine (Socket.IO) | Socket handshake auth, events (`message:send`, `typing`, `presence`), room handlers | Pending |
+| **Phase 10** | **Real-Time Engine (Socket.IO & Presence)** | Socket.IO server bootstrap, JWT handshake auth, user & conversation room scoping, multi-tab presence tracking with 30s write throttling, typing start/stop with 5s auto-expiry, event contracts in `@virexo/shared`, single Render instance isolation with documented Redis adapter boundary, frontend socket client singleton, Zustand socket store, Vitest socket integration tests | **COMPLETE** |
 | **Phase 11** | Testing, Polish & Free-Tier Deployment | Vitest, RTL, Supertest, Playwright E2E, Vercel & Render deployment pipelines | Pending |
 
 ---
@@ -71,13 +71,16 @@
 ### Phase 9: Message REST Domain
 - [x] Mongoose Message model (`conversationId`, `senderId`, `content`, `attachments`, `idempotencyKey`, `reactions`, `readBy`, `isEdited`, `isDeleted`).
 - [x] Compound index `{ conversationId: 1, createdAt: -1 }` for reverse-chronological pagination.
-- [x] Endpoints under `/api/v1/messages`:
-  - `POST /` — create message (validates conversation membership, checks `idempotencyKey` deduplication, updates conversation `lastMessageId` and sender `lastReadAt`, returns populated message DTO)
-  - `GET /conversation/:conversationId` — cursor-based history pagination (`createdAt < cursor`, stable reverse chronological ordering, calculates `unreadCount`)
-  - `POST /conversation/:conversationId/read` — marks conversation read, updates member `lastReadAt` and message `readBy` arrays
-  - `DELETE /:id` — soft deletion (sets `isDeleted: true`, replaces content with `"[This message was deleted]"` and clears attachments)
-- [x] `messageValidators.js` — input validation rules.
-- [x] `messageApi.js` — Axios wrapper module.
-- [x] `ChannelPage.jsx` & `DirectMessagePage.jsx` connected to real message REST API with live timeline display, enter-key message submission, optimistic appending, scroll-to-bottom, load earlier messages pagination, and soft deletion.
-- [x] All 70 tests passing across monorepo (44 backend integration + 26 frontend unit).
+- [x] Endpoints under `/api/v1/messages`.
+
+### Phase 10: Real-Time Engine (Socket.IO & Presence)
+- [x] Socket.IO server bootstrap with HTTP server wrapper (`apps/api/src/index.js`, `socketServer.js`).
+- [x] JWT handshake authentication middleware (`socketAuth.js`).
+- [x] User personal rooms (`user:<userId>`) and authorized conversation rooms (`conversation:<conversationId>`).
+- [x] Presence manager (`presenceManager.js`) with multi-tab connection counting and 30-second DB write throttling for `User.status` and `lastSeen`.
+- [x] Typing indicators (`typing:start`, `typing:stop`) with 5s auto-expiry timers.
+- [x] Explicit socket event contracts in `@virexo/shared` (`SOCKET_EVENTS`).
+- [x] Single Render instance isolation with documented `@socket.io/redis-adapter` boundary for future multi-instance horizontal scaling.
+- [x] Frontend socket client manager (`socketClient.js`) & Zustand socket store (`useSocketStore.js`).
+- [x] All 76 tests passing across monorepo (48 backend integration + 28 frontend unit).
 - [x] ESLint passing clean (0 errors, 0 warnings) and production build succeeded.

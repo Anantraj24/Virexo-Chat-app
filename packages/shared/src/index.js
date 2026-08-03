@@ -19,6 +19,20 @@ export const HTTP_STATUS = {
   INTERNAL_SERVER_ERROR: 500,
 };
 
+export const SOCKET_EVENTS = {
+  CONNECT: 'connection',
+  DISCONNECT: 'disconnect',
+  ERROR: 'error',
+  JOIN_CONVERSATION: 'conversation:join',
+  LEAVE_CONVERSATION: 'conversation:leave',
+  TYPING_START: 'typing:start',
+  TYPING_STOP: 'typing:stop',
+  TYPING_INDICATOR: 'typing:indicator',
+  USER_PRESENCE: 'presence:status',
+  MESSAGE_NEW: 'message:new',
+  MESSAGE_DELETED: 'message:deleted',
+};
+
 export const createApiResponse = (success, data = null, error = null) => ({
   success,
   data,
