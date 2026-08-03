@@ -1,8 +1,8 @@
 # Virexo Build Status & Progress Tracker
 
 ## 1. Executive Status Summary
-- **Current Phase**: **Phase 7 - User Profile, Privacy and Preferences**
-- **Overall Status**: Complete profile management, privacy controls, notification settings, and search API implemented, tested & verified
+- **Current Phase**: **Phase 8 - Conversation Domain**
+- **Overall Status**: Direct DM uniqueness, group channels, cursor pagination, role-based authorization, member role management, ownership transfer, and frontend modals/sidebar integration implemented, tested & verified
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -17,10 +17,11 @@
 | **Phase 4** | **Authentication Backend** | User model, bcrypt, short-lived JWT access tokens (15m), HttpOnly rotating refresh tokens, hashed token DB storage, reuse detection, auth rate limiting, middleware, Vitest & MongoMemoryServer tests | **COMPLETE** |
 | **Phase 5** | **Email Verification & Password Recovery** | Email service with Brevo/console adapters, verify email, resend with cooldown, forgot password (no enumeration), reset password (revokes sessions), HTML+text templates, integration tests | **COMPLETE** |
 | **Phase 6** | **Authentication Frontend** | Login, signup, remember me, verify-email result, resend verification, forgot password, reset password, ProtectedRoute, GuestRoute, in-memory tokens, silent refresh, Axios 401 refresh dedup, logout & logout-all UI, Vitest web tests | **COMPLETE** |
-| **Phase 7** | **User Profile, Privacy & Preferences** | User schema extensions (displayName, bio, lastSeen, privacySettings, notificationSettings), profile update APIs, username availability check, search-safe user search, multi-tab SettingsPage (Profile, Appearance, Privacy, Notifications), local FileReader avatar preview, UserProfileModal card | **COMPLETE** |
-| **Phase 8** | REST API & Upload Processing | Express controllers, validators, Cloudinary memory streaming, pagination endpoints | Pending |
-| **Phase 9** | Real-Time Engine (Socket.IO) | Socket handshake auth, events (`message:send`, `typing`, `presence`), room handlers | Pending |
-| **Phase 10** | Testing, Polish & Free-Tier Deployment | Vitest, RTL, Supertest, Playwright E2E, Vercel & Render deployment pipelines | Pending |
+| **Phase 7** | **User Profile, Privacy & Preferences** | User schema extensions (displayName, bio, lastSeen, privacySettings, notificationSettings), profile update APIs, username availability check, search-safe user search, multi-tab SettingsPage, local FileReader avatar preview, UserProfileModal | **COMPLETE** |
+| **Phase 8** | **Conversation Domain** | Mongoose Conversation model with embedded members, directKey uniqueness, group creation, cursor pagination, role-based authorization (owner/admin/member), member management, role promotion/demotion, ownership transfer, leaving group, conversationApi, sidebar live channel/DM rendering, NewDMModal, CreateGroupModal, GroupSettingsModal | **COMPLETE** |
+| **Phase 9** | REST API & Upload Processing | Express controllers, validators, Cloudinary memory streaming, pagination endpoints | Pending |
+| **Phase 10** | Real-Time Engine (Socket.IO) | Socket handshake auth, events (`message:send`, `typing`, `presence`), room handlers | Pending |
+| **Phase 11** | Testing, Polish & Free-Tier Deployment | Vitest, RTL, Supertest, Playwright E2E, Vercel & Render deployment pipelines | Pending |
 
 ---
 
@@ -49,43 +50,38 @@
 - [x] Short-lived JWT access tokens (15m) and rotating refresh tokens with unique UUID `jti` payloads.
 - [x] Endpoints: `POST /signup`, `POST /login` (rememberMe support), `POST /refresh`, `POST /logout`, `POST /logout-all`, `GET /me`.
 - [x] Security features: HttpOnly SameSite=Strict cookies, token reuse detection (revokes all family sessions upon replay attack), generic auth errors.
-- [x] Auth validation rules (`express-validator`) and IP rate limiting (`express-rate-limit`).
-- [x] Auth middleware (`authenticate`) enforcing `Authorization: Bearer <token>`.
 
 ### Phase 5: Email Verification & Password Recovery
 - [x] Provider-independent email service with adapter pattern (`apps/api/src/services/emailService.js`).
 - [x] Console adapter for local development (`apps/api/src/services/email/consoleAdapter.js`).
 - [x] Brevo HTTP API adapter for production (`apps/api/src/services/email/brevoAdapter.js`) — uses native `fetch`, no SDK.
-- [x] HTML and plain-text email templates with dark-themed premium styling (`apps/api/src/services/email/templates.js`).
-- [x] User model extended with `isEmailVerified`, `emailVerificationToken`, `emailVerificationExpires`, `lastVerificationSentAt`, `passwordResetToken`, `passwordResetExpires`.
-- [x] SHA-256 hashed verification/reset tokens stored in DB. Raw tokens never logged or persisted.
 
 ### Phase 6: Authentication Frontend
 - [x] In-memory access token storage via Zustand (`useAuthStore.js`). Zero localStorage usage.
 - [x] Axios request interceptor auto-attaches `Authorization: Bearer <token>` from memory.
-- [x] Axios 401 response interceptor performs automatic token refresh with request deduplication (queues simultaneous 401s behind a single `/refresh` call).
-- [x] `AuthInitializer` component runs silent refresh on app boot before rendering protected routes.
-- [x] `ProtectedRoute` guard redirects unauthenticated users to `/login`.
-- [x] `GuestRoute` guard redirects authenticated users away from `/login` and `/register`.
+- [x] Axios 401 response interceptor performs automatic token refresh with request deduplication.
 
 ### Phase 7: User Profile, Privacy & Preferences
 - [x] Mongoose User model extended with `displayName`, `bio`, `lastSeen`, `privacySettings`, `notificationSettings`.
-- [x] Endpoints under `/api/v1/users`:
-  - `GET /profile` — fetches authenticated user profile
-  - `PATCH /profile` — updates username, displayName, bio, avatarUrl (validates unique username)
-  - `PATCH /privacy` — updates privacySettings (showOnlineStatus, showLastSeen, allowDirectMessages)
-  - `PATCH /notifications` — updates notificationSettings (email, desktop, sound, mentions)
-  - `GET /check-username` — debounced username availability check
-  - `GET /search` — search-safe user query (strips email/tokens, respects privacy controls)
-  - `GET /:id` — public user profile lookup
-- [x] `userValidators.js` — input validation rules for all profile, privacy, and notification routes.
-- [x] `userApi.js` — Axios wrapper module for user endpoints.
-- [x] `SettingsPage.jsx` — multi-tab interface:
-  - **Profile & Account**: Editable display name, debounced username availability checking, bio editor, local avatar preview via `FileReader`, read-only email status.
-  - **Appearance**: Integrated with `usePreferencesStore` (Light / Dark / System themes, Reduced Motion toggle).
-  - **Privacy & Security**: Online status toggle, last seen toggle, direct message permissions dropdown.
-  - **Notifications**: Email digest, desktop push, sound chimes, mention alerts.
-- [x] `UserProfileModal.jsx` — public profile card showing avatar, status, role badge, bio, and member since date.
-- [x] `AppLayout.jsx` updated to render user `displayName` or `username` in sidebar footer.
-- [x] All 55 tests passing across monorepo (34 backend integration + 21 frontend unit).
+- [x] Profile, privacy, notification update APIs, username check, search-safe user query.
+
+### Phase 8: Conversation Domain
+- [x] Mongoose Conversation model with embedded `members` sub-document array (`userId`, `role`: owner/admin/member, `joinedAt`, `lastReadAt`).
+- [x] Direct conversation uniqueness via `directKey` (`[idA, idB].sort().join('_')`). Re-requesting DM returns existing conversation without duplicates.
+- [x] Endpoints under `/api/v1/conversations`:
+  - `POST /direct` — create/retrieve 1-on-1 DM
+  - `POST /group` — create multi-user group channel (sets creator as owner)
+  - `GET /` — cursor-paginated active conversations list sorted by recency
+  - `GET /:id` — conversation details (requires membership)
+  - `PATCH /:id` — edit group details (requires owner/admin)
+  - `POST /:id/members` — add group members (requires owner/admin)
+  - `DELETE /:id/members/:userId` — remove member (requires owner/admin or self)
+  - `PATCH /:id/members/:userId/role` — promote/demote admin role (requires owner)
+  - `POST /:id/leave` — leave group with automatic owner fallback succession
+  - `POST /:id/transfer-ownership` — transfer owner role to another member
+- [x] `conversationValidators.js` — input validation rules.
+- [x] `conversationApi.js` — Axios wrapper module.
+- [x] `AppLayout.jsx` updated to render dynamic backend channels & DMs in sidebar.
+- [x] UI Modals: `NewDMModal.jsx` (live user search), `CreateGroupModal.jsx` (group channel creation), `GroupSettingsModal.jsx` (role management & group settings).
+- [x] All 63 tests passing across monorepo (40 backend integration + 23 frontend unit).
 - [x] ESLint passing clean (0 errors, 0 warnings) and production build succeeded.

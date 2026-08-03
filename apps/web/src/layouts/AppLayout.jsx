@@ -1,11 +1,16 @@
+import { useState, useEffect, useCallback } from 'react';
 import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import { APP_NAME } from '@virexo/shared';
 import { usePreferencesStore } from '../store/usePreferencesStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useToast } from '../components/ui/Toast';
 import { logoutRequest, logoutAllRequest, resendVerificationRequest } from '../api/authApi';
+import { listConversationsRequest } from '../api/conversationApi';
 import { Avatar } from '../components/ui/Avatar';
 import { Dropdown } from '../components/ui/Dropdown';
+import { NewDMModal } from '../components/NewDMModal';
+import { CreateGroupModal } from '../components/CreateGroupModal';
+import { GroupSettingsModal } from '../components/GroupSettingsModal';
 import {
   Hash,
   MessageSquare,
@@ -22,15 +27,39 @@ import {
   ShieldAlert,
   AlertTriangle,
   Mail,
+  MoreVertical,
 } from 'lucide-react';
-import { useState } from 'react';
 
 export function AppLayout() {
   const { theme, setTheme, sidebarOpen, toggleSidebar, setSidebarOpen } = usePreferencesStore();
   const { user, clearAuth } = useAuthStore();
   const { addToast } = useToast();
   const navigate = useNavigate();
+
   const [resendingEmail, setResendingEmail] = useState(false);
+  const [conversations, setConversations] = useState([]);
+  const [loadingConversations, setLoadingConversations] = useState(false);
+
+  // Modals state
+  const [dmModalOpen, setDmModalOpen] = useState(false);
+  const [groupModalOpen, setGroupModalOpen] = useState(false);
+  const [activeGroupSettings, setActiveGroupSettings] = useState(null);
+
+  const fetchConversations = useCallback(async () => {
+    setLoadingConversations(true);
+    try {
+      const res = await listConversationsRequest({ limit: 50 });
+      setConversations(res.data.conversations || []);
+    } catch {
+      // Ignore initial load error silently
+    } finally {
+      setLoadingConversations(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchConversations();
+  }, [fetchConversations]);
 
   const handleLogout = async () => {
     try {
@@ -84,17 +113,15 @@ export function AppLayout() {
     { label: 'Sign Out', icon: <LogOut className="w-3.5 h-3.5" />, danger: true, onClick: handleLogout },
   ];
 
-  const mockChannels = [
-    { id: 'general', name: 'general', type: 'public' },
-    { id: 'announcements', name: 'announcements', type: 'public' },
-    { id: 'dev-chat', name: 'dev-chat', type: 'private' },
-  ];
+  // Separate channels (group/channel) and direct DMs
+  const channels = conversations.filter((c) => c.type === 'group' || c.type === 'channel');
+  const directMessages = conversations.filter((c) => c.type === 'direct');
 
-  const mockDMs = [
-    { id: 'alex', name: 'Alex Rivera', status: 'online' },
-    { id: 'sarah', name: 'Sarah Chen', status: 'away' },
-    { id: 'jordan', name: 'Jordan Vance', status: 'offline' },
-  ];
+  // Helper to format DM user name
+  const getDMRecipient = (conv) => {
+    const otherMember = conv.members?.find((m) => (m.userId._id || m.userId).toString() !== user?._id);
+    return otherMember?.userId || { username: 'Unknown User', displayName: 'Unknown User' };
+  };
 
   return (
     <div className="h-screen w-screen bg-zinc-950 text-zinc-100 flex overflow-hidden selection:bg-indigo-500 selection:text-white">
@@ -123,7 +150,7 @@ export function AppLayout() {
 
           <button
             onClick={toggleSidebar}
-            className="md:hidden text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition"
+            className="md:hidden text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -131,32 +158,50 @@ export function AppLayout() {
 
         {/* Sidebar Navigation */}
         <div className="flex-1 overflow-y-auto p-3 space-y-6">
-          {/* Channels Section */}
+          {/* Group Channels Section */}
           <div>
             <div className="flex items-center justify-between text-[11px] font-bold text-zinc-400 uppercase tracking-wider px-2 mb-1.5">
               <span>Channels</span>
-              <button className="hover:text-white p-0.5 rounded transition cursor-pointer" title="Create channel">
+              <button
+                onClick={() => setGroupModalOpen(true)}
+                className="hover:text-white p-0.5 rounded transition cursor-pointer"
+                title="Create Group Channel"
+              >
                 <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
 
             <nav className="space-y-0.5">
-              {mockChannels.map((channel) => (
-                <NavLink
-                  key={channel.id}
-                  to={`/channels/${channel.id}`}
-                  className={({ isActive }) =>
-                    `flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
-                      isActive
-                        ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
-                        : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'
-                    }`
-                  }
-                >
-                  <Hash className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                  <span className="truncate">{channel.name}</span>
-                </NavLink>
-              ))}
+              {loadingConversations ? (
+                <div className="px-2 py-2 text-xs text-zinc-500">Loading channels...</div>
+              ) : channels.length > 0 ? (
+                channels.map((channel) => (
+                  <div key={channel._id} className="group flex items-center justify-between">
+                    <NavLink
+                      to={`/channels/${channel._id}`}
+                      className={({ isActive }) =>
+                        `flex-1 flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
+                          isActive
+                            ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
+                            : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'
+                        }`
+                      }
+                    >
+                      <Hash className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                      <span className="truncate">{channel.name}</span>
+                    </NavLink>
+                    <button
+                      onClick={() => setActiveGroupSettings(channel)}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-white transition cursor-pointer"
+                      title="Group Settings"
+                    >
+                      <MoreVertical className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="px-2 py-1.5 text-xs text-zinc-500">No channels yet</div>
+              )}
             </nav>
           </div>
 
@@ -164,28 +209,41 @@ export function AppLayout() {
           <div>
             <div className="flex items-center justify-between text-[11px] font-bold text-zinc-400 uppercase tracking-wider px-2 mb-1.5">
               <span>Direct Messages</span>
-              <button className="hover:text-white p-0.5 rounded transition cursor-pointer" title="New message">
+              <button
+                onClick={() => setDmModalOpen(true)}
+                className="hover:text-white p-0.5 rounded transition cursor-pointer"
+                title="New Direct Message"
+              >
                 <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
 
             <nav className="space-y-0.5">
-              {mockDMs.map((dm) => (
-                <NavLink
-                  key={dm.id}
-                  to={`/dms/${dm.id}`}
-                  className={({ isActive }) =>
-                    `flex items-center space-x-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
-                      isActive
-                        ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
-                        : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'
-                    }`
-                  }
-                >
-                  <Avatar name={dm.name} size="xs" status={dm.status} />
-                  <span className="truncate">{dm.name}</span>
-                </NavLink>
-              ))}
+              {loadingConversations ? (
+                <div className="px-2 py-2 text-xs text-zinc-500">Loading DMs...</div>
+              ) : directMessages.length > 0 ? (
+                directMessages.map((dm) => {
+                  const recipient = getDMRecipient(dm);
+                  return (
+                    <NavLink
+                      key={dm._id}
+                      to={`/dms/${dm._id}`}
+                      className={({ isActive }) =>
+                        `flex items-center space-x-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
+                          isActive
+                            ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
+                            : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'
+                        }`
+                      }
+                    >
+                      <Avatar name={recipient.displayName || recipient.username} src={recipient.avatarUrl} size="xs" status={recipient.status} />
+                      <span className="truncate">{recipient.displayName || recipient.username}</span>
+                    </NavLink>
+                  );
+                })
+              ) : (
+                <div className="px-2 py-1.5 text-xs text-zinc-500">No direct messages</div>
+              )}
             </nav>
           </div>
         </div>
@@ -285,6 +343,24 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Modals */}
+      <NewDMModal
+        isOpen={dmModalOpen}
+        onClose={() => setDmModalOpen(false)}
+        onConversationCreated={fetchConversations}
+      />
+      <CreateGroupModal
+        isOpen={groupModalOpen}
+        onClose={() => setGroupModalOpen(false)}
+        onGroupCreated={fetchConversations}
+      />
+      <GroupSettingsModal
+        isOpen={!!activeGroupSettings}
+        onClose={() => setActiveGroupSettings(null)}
+        conversation={activeGroupSettings}
+        onUpdated={fetchConversations}
+      />
     </div>
   );
 }
