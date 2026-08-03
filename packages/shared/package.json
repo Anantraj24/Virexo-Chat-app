@@ -1,0 +1,13 @@
+{
+  "name": "@virexo/shared",
+  "version": "1.0.0",
+  "description": "Shared constants and utilities for Virexo application",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "build": "echo \"Shared package ready\""
+  }
+}

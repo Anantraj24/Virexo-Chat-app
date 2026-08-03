@@ -1,0 +1,27 @@
+{
+  "name": "virexo-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Virexo Real-Time Chat Application Monorepo",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npx concurrently -k -n \"api,web\" -c \"blue,green\" \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "build": "npm run build --workspaces",
+    "lint": "npx --no-install eslint .",
+    "lint:fix": "npx --no-install eslint . --fix",
+    "format": "npx prettier --write ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.20.1",
+    "eslint-plugin-react": "^7.37.4",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "globals": "^15.15.0",
+    "prettier": "^3.5.1"
+  }
+}
