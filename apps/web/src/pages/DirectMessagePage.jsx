@@ -3,16 +3,20 @@ import { useParams } from 'react';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
 import { Spinner } from '../components/ui/Spinner';
-import { MessageSquare, Send, Trash2, ArrowUp } from 'lucide-react';
+import { MessageSquare, Send, Trash2, ArrowUp, Check, CheckCheck } from 'lucide-react';
 import { getConversationRequest } from '../api/conversationApi';
 import { sendMessageRequest, getMessageHistoryRequest, deleteMessageRequest, markReadRequest } from '../api/messageApi';
 import { useAuthStore } from '../store/useAuthStore';
+import { useSocketStore } from '../store/useSocketStore';
+import { socketClientManager } from '../lib/socketClient';
+import { SOCKET_EVENTS } from '@virexo/shared';
 import { useToast } from '../components/ui/Toast';
 
 export function DirectMessagePage() {
-  const { id } = useParams(); // conversation ID
+  const { id } = useParams();
   const { user: currentUser } = useAuthStore();
   const { addToast } = useToast();
+  const typingUsers = useSocketStore((state) => state.getTypingUsersForConversation(id));
 
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -20,11 +24,11 @@ export function DirectMessagePage() {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
 
-  // Pagination state
   const [pagination, setPagination] = useState({ hasNextPage: false, nextCursor: null });
   const [loadingMore, setLoadingMore] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -45,6 +49,12 @@ export function DirectMessagePage() {
       setPagination(historyRes.data.pagination || {});
 
       markReadRequest(id).catch(() => {});
+
+      const socket = socketClientManager.connect();
+      if (socket) {
+        socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, { conversationId: id });
+        socket.emit(SOCKET_EVENTS.MESSAGE_READ, { conversationId: id });
+      }
     } catch (err) {
       addToast({ message: err.message || 'Failed to load DM history', type: 'error' });
     } finally {
@@ -54,13 +64,56 @@ export function DirectMessagePage() {
 
   useEffect(() => {
     loadDMData();
-  }, [loadDMData]);
+
+    const socket = socketClientManager.getSocket();
+    if (socket) {
+      const handleNewMessage = ({ message, conversationId }) => {
+        if (conversationId === id) {
+          setMessages((prev) => [...prev, message]);
+          socket.emit(SOCKET_EVENTS.MESSAGE_DELIVERED, { conversationId: id, messageId: message._id });
+          socket.emit(SOCKET_EVENTS.MESSAGE_READ, { conversationId: id });
+          setTimeout(scrollToBottom, 50);
+        }
+      };
+
+      const handleDeletedMessage = ({ messageId, conversationId }) => {
+        if (conversationId === id) {
+          setMessages((prev) =>
+            prev.map((m) => (m._id === messageId ? { ...m, isDeleted: true, content: '[This message was deleted]', attachments: [] } : m))
+          );
+        }
+      };
+
+      socket.on(SOCKET_EVENTS.MESSAGE_NEW, handleNewMessage);
+      socket.on(SOCKET_EVENTS.MESSAGE_DELETED, handleDeletedMessage);
+
+      return () => {
+        socket.off(SOCKET_EVENTS.MESSAGE_NEW, handleNewMessage);
+        socket.off(SOCKET_EVENTS.MESSAGE_DELETED, handleDeletedMessage);
+        socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, { conversationId: id });
+      };
+    }
+  }, [id, loadDMData]);
 
   useEffect(() => {
     if (!loading && messages.length > 0) {
       scrollToBottom();
     }
   }, [loading, messages.length]);
+
+  const handleInputChange = (e) => {
+    setInputText(e.target.value);
+    const socket = socketClientManager.getSocket();
+
+    if (socket && id) {
+      socket.emit(SOCKET_EVENTS.TYPING_START, { conversationId: id });
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.emit(SOCKET_EVENTS.TYPING_STOP, { conversationId: id });
+      }, 2000);
+    }
+  };
 
   const handleLoadEarlier = async () => {
     if (!pagination.nextCursor || loadingMore) return;
@@ -87,6 +140,11 @@ export function DirectMessagePage() {
     const idempotencyKey = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString();
     setInputText('');
     setSending(true);
+
+    const socket = socketClientManager.getSocket();
+    if (socket) {
+      socket.emit(SOCKET_EVENTS.TYPING_STOP, { conversationId: id });
+    }
 
     try {
       const res = await sendMessageRequest({
@@ -125,6 +183,16 @@ export function DirectMessagePage() {
       (m) => (m.userId._id || m.userId).toString() !== currentUser?._id
     );
     return otherMember?.userId || { username: 'User', displayName: 'User', status: 'offline' };
+  };
+
+  const renderStatusTicks = (status) => {
+    if (status === 'read') {
+      return <CheckCheck className="w-3.5 h-3.5 text-sky-400" title="Read" />;
+    }
+    if (status === 'delivered') {
+      return <CheckCheck className="w-3.5 h-3.5 text-zinc-400" title="Delivered" />;
+    }
+    return <Check className="w-3.5 h-3.5 text-zinc-500" title="Sent" />;
   };
 
   if (loading) {
@@ -181,6 +249,7 @@ export function DirectMessagePage() {
                   <div className="flex items-center space-x-2">
                     <span className="text-xs font-bold text-zinc-100">{sender.displayName || sender.username}</span>
                     <span className="text-[10px] text-zinc-500">{timeStr}</span>
+                    {isSelf && !msg.isDeleted && renderStatusTicks(msg.status || 'sent')}
                   </div>
 
                   <div className={`text-xs mt-1 leading-relaxed ${msg.isDeleted ? 'italic text-zinc-500' : 'text-zinc-300'}`}>
@@ -212,13 +281,20 @@ export function DirectMessagePage() {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Typing Indicator */}
+      {typingUsers.length > 0 && (
+        <div className="px-2 py-1 text-[11px] text-indigo-400 animate-pulse">
+          {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
+        </div>
+      )}
+
       {/* Input Message Box */}
       <form onSubmit={handleSendMessage} className="pt-3 border-t border-zinc-800/80 mt-2 flex items-center space-x-2 shrink-0">
         <input
           type="text"
           placeholder={`Message @${recipient.username}...`}
           value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
+          onChange={handleInputChange}
           disabled={sending}
           className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
         />

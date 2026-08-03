@@ -1,18 +1,22 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react';
-import { Hash, Users, MessageSquare, Send, Trash2, ArrowUp } from 'lucide-react';
+import { Hash, Users, MessageSquare, Send, Trash2, ArrowUp, Check, CheckCheck } from 'lucide-react';
 import { Spinner } from '../components/ui/Spinner';
 import { Button } from '../components/ui/Button';
 import { Avatar } from '../components/ui/Avatar';
 import { getConversationRequest } from '../api/conversationApi';
 import { sendMessageRequest, getMessageHistoryRequest, deleteMessageRequest, markReadRequest } from '../api/messageApi';
 import { useAuthStore } from '../store/useAuthStore';
+import { useSocketStore } from '../store/useSocketStore';
+import { socketClientManager } from '../lib/socketClient';
+import { SOCKET_EVENTS } from '@virexo/shared';
 import { useToast } from '../components/ui/Toast';
 
 export function ChannelPage() {
-  const { id } = useParams(); // conversation ID
+  const { id } = useParams();
   const { user: currentUser } = useAuthStore();
   const { addToast } = useToast();
+  const typingUsers = useSocketStore((state) => state.getTypingUsersForConversation(id));
 
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -20,11 +24,11 @@ export function ChannelPage() {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
 
-  // Pagination state
   const [pagination, setPagination] = useState({ hasNextPage: false, nextCursor: null });
   const [loadingMore, setLoadingMore] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -35,7 +39,6 @@ export function ChannelPage() {
     setLoading(true);
 
     try {
-      // Fetch conversation metadata & initial message history
       const [convRes, historyRes] = await Promise.all([
         getConversationRequest(id),
         getMessageHistoryRequest(id, { limit: 50 }),
@@ -45,8 +48,14 @@ export function ChannelPage() {
       setMessages(historyRes.data.messages || []);
       setPagination(historyRes.data.pagination || {});
 
-      // Mark conversation read
       markReadRequest(id).catch(() => {});
+
+      // Connect socket & join conversation room
+      const socket = socketClientManager.connect();
+      if (socket) {
+        socket.emit(SOCKET_EVENTS.JOIN_CONVERSATION, { conversationId: id });
+        socket.emit(SOCKET_EVENTS.MESSAGE_READ, { conversationId: id });
+      }
     } catch (err) {
       addToast({ message: err.message || 'Failed to load channel messages', type: 'error' });
     } finally {
@@ -56,13 +65,57 @@ export function ChannelPage() {
 
   useEffect(() => {
     loadChannelData();
-  }, [loadChannelData]);
+
+    // Listen for real-time socket events
+    const socket = socketClientManager.getSocket();
+    if (socket) {
+      const handleNewMessage = ({ message, conversationId }) => {
+        if (conversationId === id) {
+          setMessages((prev) => [...prev, message]);
+          socket.emit(SOCKET_EVENTS.MESSAGE_DELIVERED, { conversationId: id, messageId: message._id });
+          socket.emit(SOCKET_EVENTS.MESSAGE_READ, { conversationId: id });
+          setTimeout(scrollToBottom, 50);
+        }
+      };
+
+      const handleDeletedMessage = ({ messageId, conversationId }) => {
+        if (conversationId === id) {
+          setMessages((prev) =>
+            prev.map((m) => (m._id === messageId ? { ...m, isDeleted: true, content: '[This message was deleted]', attachments: [] } : m))
+          );
+        }
+      };
+
+      socket.on(SOCKET_EVENTS.MESSAGE_NEW, handleNewMessage);
+      socket.on(SOCKET_EVENTS.MESSAGE_DELETED, handleDeletedMessage);
+
+      return () => {
+        socket.off(SOCKET_EVENTS.MESSAGE_NEW, handleNewMessage);
+        socket.off(SOCKET_EVENTS.MESSAGE_DELETED, handleDeletedMessage);
+        socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, { conversationId: id });
+      };
+    }
+  }, [id, loadChannelData]);
 
   useEffect(() => {
     if (!loading && messages.length > 0) {
       scrollToBottom();
     }
   }, [loading, messages.length]);
+
+  const handleInputChange = (e) => {
+    setInputText(e.target.value);
+    const socket = socketClientManager.getSocket();
+
+    if (socket && id) {
+      socket.emit(SOCKET_EVENTS.TYPING_START, { conversationId: id });
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.emit(SOCKET_EVENTS.TYPING_STOP, { conversationId: id });
+      }, 2000);
+    }
+  };
 
   const handleLoadEarlier = async () => {
     if (!pagination.nextCursor || loadingMore) return;
@@ -90,6 +143,11 @@ export function ChannelPage() {
     setInputText('');
     setSending(true);
 
+    const socket = socketClientManager.getSocket();
+    if (socket) {
+      socket.emit(SOCKET_EVENTS.TYPING_STOP, { conversationId: id });
+    }
+
     try {
       const res = await sendMessageRequest({
         conversationId: id,
@@ -102,7 +160,7 @@ export function ChannelPage() {
       setTimeout(scrollToBottom, 50);
     } catch (err) {
       addToast({ message: err.message || 'Failed to send message', type: 'error' });
-      setInputText(content); // restore input on failure
+      setInputText(content);
     } finally {
       setSending(false);
     }
@@ -122,6 +180,16 @@ export function ChannelPage() {
     }
   };
 
+  const renderStatusTicks = (status) => {
+    if (status === 'read') {
+      return <CheckCheck className="w-3.5 h-3.5 text-sky-400" title="Read" />;
+    }
+    if (status === 'delivered') {
+      return <CheckCheck className="w-3.5 h-3.5 text-zinc-400" title="Delivered" />;
+    }
+    return <Check className="w-3.5 h-3.5 text-zinc-500" title="Sent" />;
+  };
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -132,7 +200,7 @@ export function ChannelPage() {
 
   return (
     <div className="h-full flex flex-col justify-between max-w-5xl mx-auto">
-      {/* Channel Header */}
+      {/* Header */}
       <div className="border-b border-zinc-800/80 pb-3 mb-3 flex items-center justify-between shrink-0">
         <div className="flex items-center space-x-2.5">
           <div className="w-8 h-8 rounded-lg bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
@@ -154,9 +222,8 @@ export function ChannelPage() {
         </div>
       </div>
 
-      {/* Message Feed Timeline */}
+      {/* Message Feed */}
       <div className="flex-1 overflow-y-auto space-y-4 p-2">
-        {/* Load Earlier Messages Button */}
         {pagination.hasNextPage && (
           <div className="flex justify-center py-2">
             <Button
@@ -188,6 +255,7 @@ export function ChannelPage() {
                   <div className="flex items-center space-x-2">
                     <span className="text-xs font-bold text-zinc-100">{sender.displayName || sender.username}</span>
                     <span className="text-[10px] text-zinc-500">{timeStr}</span>
+                    {isSelf && !msg.isDeleted && renderStatusTicks(msg.status || 'sent')}
                   </div>
 
                   <div className={`text-xs mt-1 leading-relaxed ${msg.isDeleted ? 'italic text-zinc-500' : 'text-zinc-300'}`}>
@@ -195,7 +263,6 @@ export function ChannelPage() {
                   </div>
                 </div>
 
-                {/* Message Actions */}
                 {isSelf && !msg.isDeleted && (
                   <button
                     onClick={() => handleDeleteMessage(msg._id)}
@@ -220,13 +287,20 @@ export function ChannelPage() {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Typing Indicator */}
+      {typingUsers.length > 0 && (
+        <div className="px-2 py-1 text-[11px] text-indigo-400 animate-pulse">
+          {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
+        </div>
+      )}
+
       {/* Input Message Box */}
       <form onSubmit={handleSendMessage} className="pt-3 border-t border-zinc-800/80 mt-2 flex items-center space-x-2 shrink-0">
         <input
           type="text"
           placeholder={`Message #${conversation?.name || 'channel'}...`}
           value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
+          onChange={handleInputChange}
           disabled={sending}
           className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
         />

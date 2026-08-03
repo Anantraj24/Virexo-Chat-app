@@ -60,6 +60,11 @@ const userSchema = new mongoose.Schema(
     privacySettings: {
       showOnlineStatus: { type: Boolean, default: true },
       showLastSeen: { type: Boolean, default: true },
+      readReceipts: {
+        type: String,
+        enum: ['everyone', 'nobody'],
+        default: 'everyone',
+      },
       allowDirectMessages: {
         type: String,
         enum: ['everyone', 'friends', 'none'],

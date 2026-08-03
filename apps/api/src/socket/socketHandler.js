@@ -1,6 +1,7 @@
 import { SOCKET_EVENTS } from '@virexo/shared';
 import { Conversation } from '../models/Conversation.js';
 import { presenceManager } from './presenceManager.js';
+import { markDelivered, markRead, syncReceiptsForUser } from '../services/receiptService.js';
 
 // Map<string, NodeJS.Timeout> to track typing auto-expiry
 const typingTimers = new Map();
@@ -62,18 +63,34 @@ export function setupSocketHandlers(io, socket) {
     if (typeof ack === 'function') ack({ success: true });
   });
 
-  // 5. Typing start event with auto-expiry timer (5s)
+  // 5. Receipt event: message:delivered
+  socket.on(SOCKET_EVENTS.MESSAGE_DELIVERED, async ({ conversationId, messageId }) => {
+    if (!conversationId) return;
+    await markDelivered(conversationId, userId, messageId);
+  });
+
+  // 6. Receipt event: message:read
+  socket.on(SOCKET_EVENTS.MESSAGE_READ, async ({ conversationId }) => {
+    if (!conversationId) return;
+    await markRead(conversationId, userId);
+  });
+
+  // 7. Reconnect Synchronization: sync:receipts
+  socket.on(SOCKET_EVENTS.RECEIPTS_SYNC, async (ack) => {
+    const syncData = await syncReceiptsForUser(userId);
+    if (typeof ack === 'function') ack({ success: true, syncData });
+  });
+
+  // 8. Typing start event with auto-expiry timer (5s)
   socket.on(SOCKET_EVENTS.TYPING_START, ({ conversationId }) => {
     if (!conversationId) return;
 
     const timerKey = `${conversationId}:${userId}`;
 
-    // Clear existing timer if any
     if (typingTimers.has(timerKey)) {
       clearTimeout(typingTimers.get(timerKey));
     }
 
-    // Broadcast typing indicator to conversation room excluding sender
     socket.to(`conversation:${conversationId}`).emit(SOCKET_EVENTS.TYPING_INDICATOR, {
       conversationId,
       userId,
@@ -81,7 +98,6 @@ export function setupSocketHandlers(io, socket) {
       isTyping: true,
     });
 
-    // Set 5s auto-expiry timer
     const timer = setTimeout(() => {
       typingTimers.delete(timerKey);
       socket.to(`conversation:${conversationId}`).emit(SOCKET_EVENTS.TYPING_INDICATOR, {
@@ -95,7 +111,7 @@ export function setupSocketHandlers(io, socket) {
     typingTimers.set(timerKey, timer);
   });
 
-  // 6. Typing stop event
+  // 9. Typing stop event
   socket.on(SOCKET_EVENTS.TYPING_STOP, ({ conversationId }) => {
     if (!conversationId) return;
 
@@ -113,7 +129,7 @@ export function setupSocketHandlers(io, socket) {
     });
   });
 
-  // 7. Disconnect cleanup
+  // 10. Disconnect cleanup
   socket.on(SOCKET_EVENTS.DISCONNECT, () => {
     const { isLastTab } = presenceManager.trackDisconnect(userId, socket.id);
     if (isLastTab) {

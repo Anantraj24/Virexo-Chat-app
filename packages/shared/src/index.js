@@ -31,6 +31,11 @@ export const SOCKET_EVENTS = {
   USER_PRESENCE: 'presence:status',
   MESSAGE_NEW: 'message:new',
   MESSAGE_DELETED: 'message:deleted',
+  MESSAGE_DELIVERED: 'message:delivered',
+  MESSAGE_READ: 'message:read',
+  RECEIPT_UPDATE: 'receipt:update',
+  UNREAD_UPDATE: 'unread:update',
+  RECEIPTS_SYNC: 'sync:receipts',
 };
 
 export const createApiResponse = (success, data = null, error = null) => ({

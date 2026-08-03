@@ -1,7 +1,9 @@
 import { Message } from '../models/Message.js';
 import { Conversation } from '../models/Conversation.js';
 import { NotFoundError, ForbiddenError } from '../utils/errors.js';
-import { createApiResponse } from '@virexo/shared';
+import { createApiResponse, SOCKET_EVENTS } from '@virexo/shared';
+import { markRead } from '../services/receiptService.js';
+import { getIO } from '../socket/socketServer.js';
 
 // Helper: Populate message sender profile DTO
 async function populateMessage(doc) {
@@ -45,26 +47,37 @@ export async function createMessage(req, res, next) {
     }
 
     // Create Message document
+    const now = new Date();
     const message = new Message({
       conversationId,
       senderId: currentUserId,
       content,
       attachments,
       idempotencyKey,
-      readBy: [{ userId: currentUserId, readAt: new Date() }],
+      readBy: [{ userId: currentUserId, readAt: now }],
     });
 
     await message.save();
 
-    // Update Conversation lastMessageId and recency timestamp
+    // Update Conversation lastMessageId, recency timestamp, and sender cursors
     conversation.lastMessageId = message._id;
-    conversation.updatedAt = new Date();
-
-    // Update sender's lastReadAt in conversation
-    member.lastReadAt = new Date();
+    conversation.updatedAt = now;
+    member.lastReadAt = now;
+    member.lastDeliveredAt = now;
     await conversation.save();
 
     await populateMessage(message);
+
+    // Broadcast real-time message:new event to conversation room
+    try {
+      const io = getIO();
+      io.to(`conversation:${conversationId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, {
+        message,
+        conversationId,
+      });
+    } catch {
+      // Socket server may not be initialized in test mode
+    }
 
     res.status(201).json(createApiResponse(true, { message, isExisting: false }));
   } catch (error) {
@@ -72,7 +85,7 @@ export async function createMessage(req, res, next) {
   }
 }
 
-// GET /api/v1/messages/conversation/:conversationId — Cursor-based History Pagination & Unread Count
+// GET /api/v1/messages/conversation/:conversationId — Cursor-based History Pagination & Status Mapping
 export async function getMessageHistory(req, res, next) {
   try {
     const { conversationId } = req.params;
@@ -110,8 +123,25 @@ export async function getMessageHistory(req, res, next) {
     const itemsDesc = hasNextPage ? rawMessages.slice(0, limit) : rawMessages;
     const nextCursor = hasNextPage ? itemsDesc[itemsDesc.length - 1].createdAt.toISOString() : null;
 
-    // Reverse to chronological order for client timeline
-    const items = itemsDesc.reverse();
+    // Map lifecycle status relative to other members in conversation
+    const otherMembers = conversation.members.filter((m) => m.userId.toString() !== currentUserId);
+
+    const items = itemsDesc.reverse().map((msgDoc) => {
+      const msgObj = msgDoc.toObject();
+      const msgDate = new Date(msgObj.createdAt);
+
+      if (msgObj.senderId._id.toString() === currentUserId) {
+        // Calculate status for sender: read if any other member has lastReadAt >= msgDate
+        const isReadByOthers = otherMembers.some((m) => m.lastReadAt && new Date(m.lastReadAt) >= msgDate);
+        const isDeliveredToOthers = otherMembers.some((m) => m.lastDeliveredAt && new Date(m.lastDeliveredAt) >= msgDate);
+
+        msgObj.status = isReadByOthers ? 'read' : isDeliveredToOthers ? 'delivered' : 'sent';
+      } else {
+        msgObj.status = 'delivered';
+      }
+
+      return msgObj;
+    });
 
     // Calculate unread count (messages created after member.lastReadAt from other senders)
     const unreadCount = await Message.countDocuments({
@@ -130,6 +160,7 @@ export async function getMessageHistory(req, res, next) {
           nextCursor,
         },
         unreadCount,
+        memberCursors: conversation.members,
       })
     );
   } catch (error) {
@@ -143,33 +174,17 @@ export async function markConversationRead(req, res, next) {
     const { conversationId } = req.params;
     const currentUserId = req.user._id.toString();
 
-    const conversation = await Conversation.findById(conversationId);
-    if (!conversation) {
-      throw new NotFoundError('Conversation not found', 'CONVERSATION_NOT_FOUND');
+    const result = await markRead(conversationId, currentUserId);
+    if (!result) {
+      throw new NotFoundError('Conversation not found or user not a member', 'CONVERSATION_NOT_FOUND');
     }
-
-    const member = conversation.members.find((m) => m.userId.toString() === currentUserId);
-    if (!member) {
-      throw new ForbiddenError('You are not a member of this conversation', 'NOT_A_MEMBER');
-    }
-
-    const now = new Date();
-    member.lastReadAt = now;
-    await conversation.save();
-
-    // Add current user to readBy array of messages in conversation
-    await Message.updateMany(
-      {
-        conversationId,
-        'readBy.userId': { $ne: currentUserId },
-      },
-      {
-        $addToSet: { readBy: { userId: currentUserId, readAt: now } },
-      }
-    );
 
     res.status(200).json(
-      createApiResponse(true, { conversationId, lastReadAt: now, unreadCount: 0 })
+      createApiResponse(true, {
+        conversationId,
+        lastReadAt: result.lastReadAt,
+        unreadCount: result.unreadCount,
+      })
     );
   } catch (error) {
     next(error);
@@ -210,6 +225,17 @@ export async function deleteMessage(req, res, next) {
 
     await message.save();
     await populateMessage(message);
+
+    // Broadcast message:deleted event to conversation room
+    try {
+      const io = getIO();
+      io.to(`conversation:${message.conversationId}`).emit(SOCKET_EVENTS.MESSAGE_DELETED, {
+        messageId: message._id,
+        conversationId: message.conversationId,
+      });
+    } catch {
+      // Ignore if socket IO server is not booted in test mode
+    }
 
     res.status(200).json(
       createApiResponse(true, { message, info: 'Message deleted successfully' })

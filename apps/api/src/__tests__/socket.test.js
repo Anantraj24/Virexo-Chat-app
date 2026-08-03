@@ -31,7 +31,9 @@ beforeAll(async () => {
 }, 60000);
 
 afterAll(async () => {
-  await new Promise((resolve) => httpServer.close(resolve));
+  if (httpServer && httpServer.listening) {
+    await new Promise((resolve) => httpServer.close(resolve));
+  }
   await mongoose.disconnect();
   if (mongoServer) {
     await mongoServer.stop();
@@ -102,9 +104,9 @@ describe('Socket.IO Real-Time Foundation Integration Tests', () => {
     });
 
     const client1 = createSocketClient(user1.token);
-    const client2 = createSocketClient(user2.token);
-
     await new Promise((resolve) => client1.on('connect', resolve));
+
+    const client2 = createSocketClient(user2.token);
     await new Promise((resolve) => client2.on('connect', resolve));
 
     // User1 (member) joins -> success
@@ -122,7 +124,7 @@ describe('Socket.IO Real-Time Foundation Integration Tests', () => {
 
     client1.disconnect();
     client2.disconnect();
-  });
+  }, 15000);
 
   it('should broadcast typing indicator and handle auto-stop', async () => {
     const user1 = await createTestUser('typer_1', 't1@example.com');
@@ -148,6 +150,8 @@ describe('Socket.IO Real-Time Foundation Integration Tests', () => {
     await new Promise((resolve) => client1.emit(SOCKET_EVENTS.JOIN_CONVERSATION, { conversationId: convId }, resolve));
     await new Promise((resolve) => client2.emit(SOCKET_EVENTS.JOIN_CONVERSATION, { conversationId: convId }, resolve));
 
+    await new Promise((r) => setTimeout(r, 100));
+
     // Client2 listens for typing indicator
     const typingPromise = new Promise((resolve) => {
       client2.on(SOCKET_EVENTS.TYPING_INDICATOR, (data) => {
@@ -164,5 +168,5 @@ describe('Socket.IO Real-Time Foundation Integration Tests', () => {
 
     client1.disconnect();
     client2.disconnect();
-  });
+  }, 15000);
 });

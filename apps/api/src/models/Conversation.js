@@ -20,6 +20,10 @@ const memberSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    lastDeliveredAt: {
+      type: Date,
+      default: Date.now,
+    },
   },
   { _id: false }
 );
