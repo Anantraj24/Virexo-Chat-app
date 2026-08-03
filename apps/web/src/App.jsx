@@ -18,6 +18,7 @@ import { HomePage } from './pages/HomePage';
 import { ChannelPage } from './pages/ChannelPage';
 import { DirectMessagePage } from './pages/DirectMessagePage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ConversationListPage } from './pages/ConversationListPage';
 
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -90,6 +91,7 @@ export default function App() {
                   }
                 >
                   <Route index element={<HomePage />} />
+                  <Route path="conversations" element={<ConversationListPage />} />
                   <Route path="channels/:id" element={<ChannelPage />} />
                   <Route path="dms/:id" element={<DirectMessagePage />} />
                   <Route path="settings" element={<SettingsPage />} />

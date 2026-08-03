@@ -1,8 +1,8 @@
 # Virexo Build Status & Progress Tracker
 
 ## 1. Executive Status Summary
-- **Current Phase**: **Phase 11 - Delivery and Read State**
-- **Overall Status**: Embedded member cursors (`lastReadAt`, `lastDeliveredAt`) in `Conversation.members`, receipt event contracts in `@virexo/shared`, privacy-aware read receipt suppression (`readReceipts: 'nobody'`), Socket.IO real-time delivery and read events, unread count calculations, reconnect synchronization (`sync:receipts`), status tick indicators (`sent`, `delivered`, `read`), and unit/integration test suites implemented, verified & passing.
+- **Current Phase**: **Phase 12 - Main Chat Interface**
+- **Overall Status**: Responsive three-region desktop layout with sidebar conversation list, mobile route-based navigation, chat header with online/last-seen, efficient message list with date separators and cursor-based upward pagination with scroll position preservation, message composer with optimistic sending and failed/retry state, real-time incoming messages via WebSocket, typing indicator, sent/delivered/read status icons, unread badges, empty/loading/error states, and all 31 frontend tests passing. Production build succeeds with no errors.
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -21,7 +21,8 @@
 | **Phase 8** | **Conversation Domain** | Mongoose Conversation model with embedded members, directKey uniqueness, group creation, cursor pagination, role-based authorization (owner/admin/member), member management, role promotion/demotion, ownership transfer, leaving group, conversationApi, sidebar live channel/DM rendering, NewDMModal, CreateGroupModal, GroupSettingsModal | **COMPLETE** |
 | **Phase 9** | **Message REST Domain** | Mongoose Message model with compound indexes & idempotencyKey sparse index, text message creation, server-generated IDs, conversation membership authorization, duplicate-request idempotency deduplication, cursor-based reverse chronological history pagination, unread count calculations, conversation lastMessageId projection, soft deletion foundation, messageApi, interactive ChannelPage & DirectMessagePage chat timelines, optimistic message appending, scroll-to-bottom, load earlier messages pagination | **COMPLETE** |
 | **Phase 10** | **Real-Time Engine (Socket.IO & Presence)** | Socket.IO server bootstrap, JWT handshake auth, user & conversation room scoping, multi-tab presence tracking with 30s write throttling, typing start/stop with 5s auto-expiry, event contracts in `@virexo/shared`, single Render instance isolation with documented Redis adapter boundary, frontend socket client singleton, Zustand socket store, Vitest socket integration tests | **COMPLETE** |
-| **Phase 11** | **Delivery and Read State** | Per-user embedded member cursors (`lastReadAt`, `lastDeliveredAt`) in `Conversation.members`, receipt event contracts (`message:delivered`, `message:read`, `receipt:update`, `unread:update`, `sync:receipts`), privacy-aware read receipt suppression (`readReceipts: 'nobody'`), unread count calculations, reconnect synchronization, status tick indicators (`sent`, `delivered`, `read`), Vitest integration & unit test suites | **COMPLETE** |
+| **Phase 11** | **Delivery and Read State** | Per-user embedded member cursors, receipt event contracts, privacy-aware read receipt suppression, unread count calculations, reconnect synchronization, status tick indicators, Vitest integration & unit test suites | **COMPLETE** |
+| **Phase 12** | **Main Chat Interface** | Responsive three-region desktop layout, mobile route-based navigation, conversation list with unread badges, chat header with online/last-seen, virtualized message list with date separators, cursor-based upward pagination with scroll preservation, message composer with optimistic sending & retry, real-time incoming messages via WebSocket, typing indicator, sent/delivered/read icons, empty/loading/error states | **COMPLETE** |
 
 ---
 
@@ -86,3 +87,18 @@
 - [x] Status tick indicators in Channel & DM UI (`sent` single tick, `delivered` double tick, `read` blue double tick).
 - [x] All 82 tests passing across monorepo (51 backend integration + 31 frontend unit).
 - [x] ESLint passing clean (0 errors, 0 warnings) and production build succeeded.
+
+### Phase 12: Main Chat Interface
+- [x] Responsive three-region desktop layout (sidebar + chat header + message list + composer).
+- [x] Mobile route-based navigation (`/conversations` list page, `/channels/:id`, `/dms/:id`).
+- [x] Conversation list with unread badges in sidebar.
+- [x] Chat header with online status and last-seen display.
+- [x] Efficient message list with date separators between message groups.
+- [x] Cursor-based upward pagination with scroll position preservation.
+- [x] Message composer with optimistic sending and failed/retry state.
+- [x] Real-time incoming messages via WebSocket (message:new, message:delivered, message:read).
+- [x] Typing indicator with animated dots.
+- [x] Sent/delivered/read status icons (Check/CheckCheck with color coding).
+- [x] Empty, loading, and error states for message list.
+- [x] Auto-scroll rules (scroll to bottom only when user is near bottom).
+- [x] All existing 31 frontend tests passing.
