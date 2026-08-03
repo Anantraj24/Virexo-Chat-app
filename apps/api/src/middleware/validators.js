@@ -44,3 +44,38 @@ export const loginRules = [
     .withMessage('Password is required'),
   handleValidationErrors,
 ];
+
+export const verifyEmailRules = [
+  body('token')
+    .trim()
+    .notEmpty()
+    .withMessage('Verification token is required')
+    .isLength({ max: 128 })
+    .withMessage('Token format is invalid'),
+  handleValidationErrors,
+];
+
+export const forgotPasswordRules = [
+  body('email')
+    .trim()
+    .toLowerCase()
+    .isEmail()
+    .withMessage('Must be a valid email address'),
+  handleValidationErrors,
+];
+
+export const resetPasswordRules = [
+  body('token')
+    .trim()
+    .notEmpty()
+    .withMessage('Reset token is required')
+    .isLength({ max: 128 })
+    .withMessage('Token format is invalid'),
+  body('password')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long')
+    .matches(/\d/)
+    .withMessage('Password must contain at least one number'),
+  handleValidationErrors,
+];
+

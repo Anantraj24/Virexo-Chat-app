@@ -1,8 +1,8 @@
 # Virexo Build Status & Progress Tracker
 
 ## 1. Executive Status Summary
-- **Current Phase**: **Phase 4 - Authentication Backend**
-- **Overall Status**: Production Security & Authentication Architecture Built, Tested & Verified
+- **Current Phase**: **Phase 5 - Email Verification & Password Recovery**
+- **Overall Status**: Account email workflows implemented, tested & verified
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -15,10 +15,11 @@
 | **Phase 2** | **Monorepo & Backend Core** | Workspaces, Express app/server separation, Mongo connection lifecycle, error handling, readiness, Vitest tests | **COMPLETE** |
 | **Phase 3** | **Frontend Foundation & Design System** | React Router, TanStack Query, Axios, Zustand preferences, UI component library, responsive layouts, 404, reduced motion | **COMPLETE** |
 | **Phase 4** | **Authentication Backend** | User model, bcrypt, short-lived JWT access tokens (15m), HttpOnly rotating refresh tokens, hashed token DB storage, reuse detection, auth rate limiting, middleware, Vitest & MongoMemoryServer tests | **COMPLETE** |
-| **Phase 5** | REST API & Upload Processing | Express controllers, validators, Cloudinary memory streaming, pagination endpoints | Pending |
-| **Phase 6** | Real-Time Engine (Socket.IO) | Socket handshake auth, events (`message:send`, `typing`, `presence`), room handlers | Pending |
-| **Phase 7** | Frontend UI & State Hydration | React 19 UI, Tailwind CSS design system, Zustand stores, TanStack Query integration | Pending |
-| **Phase 8** | Testing, Polish & Free-Tier Deployment | Vitest, RTL, Supertest, Playwright E2E, Vercel & Render deployment pipelines | Pending |
+| **Phase 5** | **Email Verification & Password Recovery** | Email service with Brevo/console adapters, verify email, resend with cooldown, forgot password (no enumeration), reset password (revokes sessions), HTML+text templates, integration tests | **COMPLETE** |
+| **Phase 6** | REST API & Upload Processing | Express controllers, validators, Cloudinary memory streaming, pagination endpoints | Pending |
+| **Phase 7** | Real-Time Engine (Socket.IO) | Socket handshake auth, events (`message:send`, `typing`, `presence`), room handlers | Pending |
+| **Phase 8** | Frontend UI & State Hydration | React 19 UI, Tailwind CSS design system, Zustand stores, TanStack Query integration | Pending |
+| **Phase 9** | Testing, Polish & Free-Tier Deployment | Vitest, RTL, Supertest, Playwright E2E, Vercel & Render deployment pipelines | Pending |
 
 ---
 
@@ -49,5 +50,21 @@
 - [x] Security features: HttpOnly SameSite=Strict cookies, token reuse detection (revokes all family sessions upon replay attack), generic auth errors.
 - [x] Auth validation rules (`express-validator`) and IP rate limiting (`express-rate-limit`).
 - [x] Auth middleware (`authenticate`) enforcing `Authorization: Bearer <token>`.
-- [x] 15/15 integration tests passing cleanly using Vitest, Supertest & `mongodb-memory-server` (`npm test -w apps/api`).
+
+### Phase 5: Email Verification & Password Recovery
+- [x] Provider-independent email service with adapter pattern (`apps/api/src/services/emailService.js`).
+- [x] Console adapter for local development (`apps/api/src/services/email/consoleAdapter.js`).
+- [x] Brevo HTTP API adapter for production (`apps/api/src/services/email/brevoAdapter.js`) — uses native `fetch`, no SDK.
+- [x] HTML and plain-text email templates with dark-themed premium styling (`apps/api/src/services/email/templates.js`).
+- [x] User model extended with `isEmailVerified`, `emailVerificationToken`, `emailVerificationExpires`, `lastVerificationSentAt`, `passwordResetToken`, `passwordResetExpires`.
+- [x] SHA-256 hashed verification/reset tokens stored in DB. Raw tokens never logged or persisted.
+- [x] Signup sets `isEmailVerified: false` and sends verification email (fire-and-forget).
+- [x] `POST /verify-email` — validates hashed token, marks verified, clears token fields.
+- [x] `POST /resend-verification` — authenticated, 60-second cooldown, rejects if already verified.
+- [x] `POST /forgot-password` — always returns success (no user enumeration).
+- [x] `POST /reset-password` — validates token, updates password, revokes all sessions.
+- [x] Validation rules for all new endpoints (`express-validator`).
+- [x] All new endpoints rate-limited via `authLimiter`.
+- [x] Environment variables: `EMAIL_PROVIDER`, `BREVO_API_KEY`, `EMAIL_FROM_NAME`, `EMAIL_FROM_ADDRESS`.
+- [x] 27/27 integration tests passing (10 auth + 12 email + 5 core).
 - [x] ESLint passing clean (0 errors, 0 warnings) and production build succeeded.

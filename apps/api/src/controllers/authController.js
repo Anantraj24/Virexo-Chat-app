@@ -11,6 +11,17 @@ import {
 import { BadRequestError, UnauthorizedError } from '../utils/errors.js';
 import { createApiResponse } from '@virexo/shared';
 import { env } from '../config/env.js';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService.js';
+
+// Constants
+const VERIFICATION_TOKEN_EXPIRY_HOURS = 24;
+const RESET_TOKEN_EXPIRY_MINUTES = 60;
+const RESEND_COOLDOWN_SECONDS = 60;
+
+// Helper to generate a cryptographically secure hex token
+function generateSecureToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
 
 // Helper to set HttpOnly refresh token cookie
 function setRefreshTokenCookie(res, token, expiresInDays) {
@@ -50,10 +61,19 @@ export async function signup(req, res, next) {
     }
 
     const passwordHash = await hashPassword(password);
+
+    // Generate email verification token
+    const rawVerificationToken = generateSecureToken();
+    const hashedVerificationToken = hashToken(rawVerificationToken);
+
     const user = new User({
       username,
       email,
       passwordHash,
+      isEmailVerified: false,
+      emailVerificationToken: hashedVerificationToken,
+      emailVerificationExpires: new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000),
+      lastVerificationSentAt: new Date(),
       refreshTokenHashes: [],
     });
 
@@ -68,6 +88,9 @@ export async function signup(req, res, next) {
     });
 
     await user.save();
+
+    // Fire-and-forget: send verification email (signup succeeds even if email fails)
+    sendVerificationEmail(user.email, user.username, rawVerificationToken);
 
     setRefreshTokenCookie(res, refreshToken, expiresInDays);
     const accessToken = generateAccessToken(user);
@@ -232,4 +255,138 @@ export async function logoutAll(req, res, next) {
 // Get Current User Profile Controller
 export async function getMe(req, res) {
   res.status(200).json(createApiResponse(true, { user: req.user.toJSON() }));
+}
+
+// ─── Email Verification & Password Recovery ─────────────────────────────
+
+// Verify Email Controller
+export async function verifyEmail(req, res, next) {
+  try {
+    const { token } = req.body;
+    const hashedToken = hashToken(token);
+
+    const user = await User.findOne({
+      emailVerificationToken: hashedToken,
+      emailVerificationExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      throw new BadRequestError('Verification token is invalid or has expired', 'INVALID_VERIFICATION_TOKEN');
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
+    await user.save();
+
+    res.status(200).json(
+      createApiResponse(true, { message: 'Email verified successfully' })
+    );
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Resend Verification Email Controller
+export async function resendVerification(req, res, next) {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (user.isEmailVerified) {
+      throw new BadRequestError('Email is already verified', 'ALREADY_VERIFIED');
+    }
+
+    // Enforce cooldown
+    if (user.lastVerificationSentAt) {
+      const elapsed = (Date.now() - user.lastVerificationSentAt.getTime()) / 1000;
+      if (elapsed < RESEND_COOLDOWN_SECONDS) {
+        const remaining = Math.ceil(RESEND_COOLDOWN_SECONDS - elapsed);
+        throw new BadRequestError(
+          `Please wait ${remaining} seconds before requesting another verification email`,
+          'RESEND_COOLDOWN'
+        );
+      }
+    }
+
+    const rawToken = generateSecureToken();
+    const hashedToken = hashToken(rawToken);
+
+    user.emailVerificationToken = hashedToken;
+    user.emailVerificationExpires = new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
+    user.lastVerificationSentAt = new Date();
+    await user.save();
+
+    await sendVerificationEmail(user.email, user.username, rawToken);
+
+    res.status(200).json(
+      createApiResponse(true, { message: 'Verification email sent' })
+    );
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Forgot Password Controller
+export async function forgotPassword(req, res, next) {
+  try {
+    const { email } = req.body;
+
+    // Always return success to prevent user enumeration
+    const successResponse = createApiResponse(true, {
+      message: 'If an account with that email exists, a password reset link has been sent',
+    });
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(200).json(successResponse);
+    }
+
+    const rawToken = generateSecureToken();
+    const hashedToken = hashToken(rawToken);
+
+    user.passwordResetToken = hashedToken;
+    user.passwordResetExpires = new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
+    await user.save();
+
+    await sendPasswordResetEmail(user.email, user.username, rawToken);
+
+    res.status(200).json(successResponse);
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Reset Password Controller
+export async function resetPassword(req, res, next) {
+  try {
+    const { token, password } = req.body;
+    const hashedToken = hashToken(token);
+
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      throw new BadRequestError('Reset token is invalid or has expired', 'INVALID_RESET_TOKEN');
+    }
+
+    // Update password
+    user.passwordHash = await hashPassword(password);
+
+    // Clear reset token fields
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+
+    // Revoke all active sessions (security: force re-authentication)
+    user.refreshTokenHashes = [];
+
+    await user.save();
+
+    res.status(200).json(
+      createApiResponse(true, { message: 'Password reset successfully. Please log in with your new password.' })
+    );
+  } catch (error) {
+    next(error);
+  }
 }

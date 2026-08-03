@@ -47,6 +47,12 @@ const userSchema = new mongoose.Schema(
       enum: ['user', 'admin'],
       default: 'user',
     },
+    isEmailVerified: { type: Boolean, default: false },
+    emailVerificationToken: { type: String, default: null },
+    emailVerificationExpires: { type: Date, default: null },
+    lastVerificationSentAt: { type: Date, default: null },
+    passwordResetToken: { type: String, default: null },
+    passwordResetExpires: { type: Date, default: null },
     refreshTokenHashes: [refreshTokenSchema],
   },
   {
@@ -62,8 +68,14 @@ userSchema.methods.toJSON = function () {
   const userObj = this.toObject();
   delete userObj.passwordHash;
   delete userObj.refreshTokenHashes;
+  delete userObj.emailVerificationToken;
+  delete userObj.emailVerificationExpires;
+  delete userObj.lastVerificationSentAt;
+  delete userObj.passwordResetToken;
+  delete userObj.passwordResetExpires;
   delete userObj.__v;
   return userObj;
 };
 
 export const User = mongoose.model('User', userSchema);
+
