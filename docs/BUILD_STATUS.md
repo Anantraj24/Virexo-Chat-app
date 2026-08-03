@@ -1,8 +1,8 @@
 # Virexo Build Status & Progress Tracker
 
 ## 1. Executive Status Summary
-- **Current Phase**: **Phase 2 - Monorepo Setup & Workspace Scaffolding**
-- **Overall Status**: Runnable Monorepo Foundation Built & Verified
+- **Current Phase**: **Phase 2 - Backend Core Application Foundation**
+- **Overall Status**: Backend Core Infrastructure Built & Verified with Integration Tests
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -12,7 +12,7 @@
 | Phase | Description | Scope / Deliverables | Status |
 | :---: | :--- | :--- | :---: |
 | **Phase 1** | **Technical Specification** | PRD, Architecture, Database Schema, API Conventions, Security Model, Build Status | **COMPLETE** |
-| **Phase 2** | **Monorepo Foundation** | npm workspaces (`apps/web`, `apps/api`, `packages/shared`), ESLint, Prettier, GET /health, Frontend health page | **COMPLETE** |
+| **Phase 2** | **Monorepo Foundation & Backend Core** | npm workspaces, Express app/server separation, Mongo connection lifecycle, error handling, readiness, Vitest integration tests | **COMPLETE** |
 | **Phase 3** | Database Schemas & Data Layer | Mongoose models (`User`, `Conversation`, `Message`, `Report`), index creation, unit tests | Pending |
 | **Phase 4** | Authentication & Security Engine | JWT access/refresh token rotation, HttpOnly cookies, bcrypt, Helmet, Auth middleware | Pending |
 | **Phase 5** | REST API & Upload Processing | Express controllers, validators, Cloudinary memory streaming, pagination endpoints | Pending |
@@ -32,10 +32,14 @@
 - [x] Token rotation, reuse detection, and upload safety model documented in `docs/SECURITY_MODEL.md`.
 - [x] Free-tier limits for Render, Vercel, MongoDB Atlas, Cloudinary, and Brevo documented across specifications.
 
-### Phase 2: Monorepo Foundation
-- [x] One root command starts web and API concurrently (`npm run dev`).
-- [x] ESLint flat config passes with zero errors and zero warnings (`npm run lint`).
-- [x] Production build of frontend succeeds (`npm run build`).
-- [x] Express API GET `/health` endpoint returns JSON payload with service health details.
-- [x] React 19 + Vite frontend health status dashboard connects to backend API.
-- [x] Shared package `@virexo/shared` exports constants and API response wrapper.
+### Phase 2: Monorepo Foundation & Backend Core
+- [x] Environment variable validation module (`apps/api/src/config/env.js`).
+- [x] MongoDB Mongoose connection lifecycle with event listeners & graceful disconnect (`apps/api/src/config/db.js`).
+- [x] Express app and server listener separation (`app.js` vs `index.js`).
+- [x] Centralized error handling & custom `AppError` hierarchy (`apps/api/src/utils/errors.js`, `errorHandler.js`).
+- [x] Request ID middleware attaching UUID to `req.id` and `X-Request-ID` header.
+- [x] Structured console logger supporting JSON output in production.
+- [x] Express security pipeline: `helmet()`, `cors()`, `cookie-parser()`, 100kb JSON body size limit.
+- [x] Liveness (`/health`) and Readiness (`/ready`) endpoints.
+- [x] Graceful shutdown handling `SIGTERM` and `SIGINT` signals cleanly.
+- [x] Integration tests suite passing using Vitest & Supertest (`npm test -w apps/api`).

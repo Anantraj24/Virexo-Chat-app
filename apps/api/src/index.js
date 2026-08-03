@@ -1,59 +1,68 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import dotenv from 'dotenv';
-import { APP_NAME, APP_VERSION, createApiResponse } from '@virexo/shared';
+import app from './app.js';
+import { env } from './config/env.js';
+import { connectDB, disconnectDB } from './config/db.js';
+import { logger } from './utils/logger.js';
 
-dotenv.config();
+let server;
 
-const app = express();
-const PORT = process.env.PORT || 5000;
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+async function startServer() {
+  try {
+    // Attempt DB connection in non-test mode (fails gracefully if DB offline during dev)
+    if (!env.isTest) {
+      try {
+        await connectDB();
+      } catch (dbErr) {
+        logger.warn(`[MongoDB] Initial connection attempt deferred: ${dbErr.message}`);
+      }
+    }
 
-// Security & Utility Middleware
-app.use(helmet());
-app.use(
-  cors({
-    origin: CLIENT_URL,
-    credentials: true,
-  })
-);
-app.use(express.json());
+    server = app.listen(env.PORT, () => {
+      logger.info(`[Virexo API] Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
+    });
+  } catch (err) {
+    logger.error(`[Server Start Failure] ${err.message}`);
+    process.exit(1);
+  }
+}
 
-// Health Check Endpoint
-app.get('/health', (req, res) => {
-  res.json(
-    createApiResponse(true, {
-      service: `${APP_NAME} API`,
-      version: APP_VERSION,
-      status: 'healthy',
-      uptime: process.uptime(),
-      timestamp: new Date().toISOString(),
-    })
-  );
-});
+// Graceful Shutdown Lifecycle
+async function gracefulShutdown(signal) {
+  logger.info(`[Shutdown] ${signal} signal received. Closing server gracefully...`);
 
-// Root endpoint redirect / baseline info
-app.get('/', (req, res) => {
-  res.json(
-    createApiResponse(true, {
-      name: APP_NAME,
-      version: APP_VERSION,
-      docs: '/health',
-    })
-  );
-});
+  if (server) {
+    server.close(async () => {
+      logger.info('[Shutdown] HTTP server closed.');
+      await disconnectDB();
+      logger.info('[Shutdown] Cleanup complete. Exiting process.');
+      process.exit(0);
+    });
 
-// 404 Handler
-app.use((req, res) => {
-  res.status(404).json(createApiResponse(false, null, { code: 'NOT_FOUND', message: 'Route not found' }));
-});
+    // Force shutdown after 10 seconds
+    setTimeout(() => {
+      logger.error('[Shutdown] Forced shutdown after timeout.');
+      process.exit(1);
+    }, 10000);
+  } else {
+    await disconnectDB();
+    process.exit(0);
+  }
+}
 
-// Start Server if executing directly
-if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
-    console.log(`[Virexo API] Server running on port ${PORT}`);
+if (!env.isTest) {
+  startServer();
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+  process.on('unhandledRejection', (reason) => {
+    logger.error('[Unhandled Rejection]', { reason: reason?.message || reason });
+  });
+
+  process.on('uncaughtException', (err) => {
+    logger.error('[Uncaught Exception]', { error: err.message, stack: err.stack });
+    gracefulShutdown('UNCAUGHT_EXCEPTION');
   });
 }
 
+export { app, server };
 export default app;
