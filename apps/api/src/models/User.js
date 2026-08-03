@@ -22,6 +22,12 @@ const userSchema = new mongoose.Schema(
       maxlength: [30, 'Username cannot exceed 30 characters'],
       match: [/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores'],
     },
+    displayName: {
+      type: String,
+      trim: true,
+      maxlength: [50, 'Display name cannot exceed 50 characters'],
+      default: '',
+    },
     email: {
       type: String,
       required: [true, 'Email is required'],
@@ -42,10 +48,29 @@ const userSchema = new mongoose.Schema(
       enum: ['online', 'offline', 'away'],
       default: 'offline',
     },
+    lastSeen: {
+      type: Date,
+      default: Date.now,
+    },
     role: {
       type: String,
       enum: ['user', 'admin'],
       default: 'user',
+    },
+    privacySettings: {
+      showOnlineStatus: { type: Boolean, default: true },
+      showLastSeen: { type: Boolean, default: true },
+      allowDirectMessages: {
+        type: String,
+        enum: ['everyone', 'friends', 'none'],
+        default: 'everyone',
+      },
+    },
+    notificationSettings: {
+      emailNotifications: { type: Boolean, default: true },
+      desktopNotifications: { type: Boolean, default: true },
+      soundEnabled: { type: Boolean, default: true },
+      notifyOnMention: { type: Boolean, default: true },
     },
     isEmailVerified: { type: Boolean, default: false },
     emailVerificationToken: { type: String, default: null },
@@ -62,6 +87,7 @@ const userSchema = new mongoose.Schema(
 
 // Indexes
 userSchema.index({ 'refreshTokenHashes.hash': 1 });
+userSchema.index({ username: 'text', displayName: 'text' });
 
 // Omit sensitive fields when serializing to JSON
 userSchema.methods.toJSON = function () {

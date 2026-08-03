@@ -195,12 +195,12 @@ export function AppLayout() {
           <Dropdown
             trigger={
               <div className="flex items-center space-x-2.5 p-1 rounded-lg hover:bg-zinc-800/60 transition group text-left cursor-pointer">
-                <Avatar name={user?.username || 'User'} status={user?.status || 'online'} size="sm" src={user?.avatarUrl} />
+                <Avatar name={user?.displayName || user?.username || 'User'} status={user?.status || 'online'} size="sm" src={user?.avatarUrl} />
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-semibold text-zinc-200 truncate group-hover:text-white">
-                    {user?.username || 'User'}
+                    {user?.displayName || user?.username || 'User'}
                   </div>
-                  <div className="text-[10px] text-zinc-400 truncate">{user?.email || ''}</div>
+                  <div className="text-[10px] text-zinc-400 truncate">@{user?.username || ''}</div>
                 </div>
               </div>
             }

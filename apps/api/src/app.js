@@ -10,6 +10,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { NotFoundError } from './utils/errors.js';
 import { logger } from './utils/logger.js';
 import authRoutes from './routes/authRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 
 // Validate environment on boot
 validateEnv();
@@ -80,6 +81,7 @@ app.get('/ready', (req, res) => {
 
 // API v1 Routes
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', userRoutes);
 
 // Root Info Endpoint
 app.get('/', (req, res) => {
@@ -90,6 +92,7 @@ app.get('/', (req, res) => {
       health: '/health',
       readiness: '/ready',
       auth: '/api/v1/auth',
+      users: '/api/v1/users',
     })
   );
 });

@@ -1,8 +1,8 @@
 # Virexo Build Status & Progress Tracker
 
 ## 1. Executive Status Summary
-- **Current Phase**: **Phase 6 - Authentication Frontend**
-- **Overall Status**: End-to-end authentication frontend built, connected, tested & verified
+- **Current Phase**: **Phase 7 - User Profile, Privacy and Preferences**
+- **Overall Status**: Complete profile management, privacy controls, notification settings, and search API implemented, tested & verified
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -17,9 +17,10 @@
 | **Phase 4** | **Authentication Backend** | User model, bcrypt, short-lived JWT access tokens (15m), HttpOnly rotating refresh tokens, hashed token DB storage, reuse detection, auth rate limiting, middleware, Vitest & MongoMemoryServer tests | **COMPLETE** |
 | **Phase 5** | **Email Verification & Password Recovery** | Email service with Brevo/console adapters, verify email, resend with cooldown, forgot password (no enumeration), reset password (revokes sessions), HTML+text templates, integration tests | **COMPLETE** |
 | **Phase 6** | **Authentication Frontend** | Login, signup, remember me, verify-email result, resend verification, forgot password, reset password, ProtectedRoute, GuestRoute, in-memory tokens, silent refresh, Axios 401 refresh dedup, logout & logout-all UI, Vitest web tests | **COMPLETE** |
-| **Phase 7** | REST API & Upload Processing | Express controllers, validators, Cloudinary memory streaming, pagination endpoints | Pending |
-| **Phase 8** | Real-Time Engine (Socket.IO) | Socket handshake auth, events (`message:send`, `typing`, `presence`), room handlers | Pending |
-| **Phase 9** | Testing, Polish & Free-Tier Deployment | Vitest, RTL, Supertest, Playwright E2E, Vercel & Render deployment pipelines | Pending |
+| **Phase 7** | **User Profile, Privacy & Preferences** | User schema extensions (displayName, bio, lastSeen, privacySettings, notificationSettings), profile update APIs, username availability check, search-safe user search, multi-tab SettingsPage (Profile, Appearance, Privacy, Notifications), local FileReader avatar preview, UserProfileModal card | **COMPLETE** |
+| **Phase 8** | REST API & Upload Processing | Express controllers, validators, Cloudinary memory streaming, pagination endpoints | Pending |
+| **Phase 9** | Real-Time Engine (Socket.IO) | Socket handshake auth, events (`message:send`, `typing`, `presence`), room handlers | Pending |
+| **Phase 10** | Testing, Polish & Free-Tier Deployment | Vitest, RTL, Supertest, Playwright E2E, Vercel & Render deployment pipelines | Pending |
 
 ---
 
@@ -58,11 +59,6 @@
 - [x] HTML and plain-text email templates with dark-themed premium styling (`apps/api/src/services/email/templates.js`).
 - [x] User model extended with `isEmailVerified`, `emailVerificationToken`, `emailVerificationExpires`, `lastVerificationSentAt`, `passwordResetToken`, `passwordResetExpires`.
 - [x] SHA-256 hashed verification/reset tokens stored in DB. Raw tokens never logged or persisted.
-- [x] Signup sets `isEmailVerified: false` and sends verification email (fire-and-forget).
-- [x] `POST /verify-email` — validates hashed token, marks verified, clears token fields.
-- [x] `POST /resend-verification` — authenticated, 60-second cooldown, rejects if already verified.
-- [x] `POST /forgot-password` — always returns success (no user enumeration).
-- [x] `POST /reset-password` — validates token, updates password, revokes all sessions.
 
 ### Phase 6: Authentication Frontend
 - [x] In-memory access token storage via Zustand (`useAuthStore.js`). Zero localStorage usage.
@@ -71,12 +67,25 @@
 - [x] `AuthInitializer` component runs silent refresh on app boot before rendering protected routes.
 - [x] `ProtectedRoute` guard redirects unauthenticated users to `/login`.
 - [x] `GuestRoute` guard redirects authenticated users away from `/login` and `/register`.
-- [x] `LoginPage` — email/password, rememberMe checkbox, client validation, error messages.
-- [x] `RegisterPage` — username/email/password, client validation, email verification toast banner.
-- [x] `VerifyEmailPage` — parses `?token=`, handles verification result, resends verification email.
-- [x] `ForgotPasswordPage` — email input, generic success response preventing email enumeration.
-- [x] `ResetPasswordPage` — new password validation, resets password and notifies of session revocation.
-- [x] `AppLayout` updated with real user state, logout current session, logout all sessions, and unverified email alert banner.
-- [x] Vitest test suite added to `apps/web` (20 unit tests covering store and validation).
-- [x] All 47 integration and unit tests passing across monorepo (27 api + 20 web).
+
+### Phase 7: User Profile, Privacy & Preferences
+- [x] Mongoose User model extended with `displayName`, `bio`, `lastSeen`, `privacySettings`, `notificationSettings`.
+- [x] Endpoints under `/api/v1/users`:
+  - `GET /profile` — fetches authenticated user profile
+  - `PATCH /profile` — updates username, displayName, bio, avatarUrl (validates unique username)
+  - `PATCH /privacy` — updates privacySettings (showOnlineStatus, showLastSeen, allowDirectMessages)
+  - `PATCH /notifications` — updates notificationSettings (email, desktop, sound, mentions)
+  - `GET /check-username` — debounced username availability check
+  - `GET /search` — search-safe user query (strips email/tokens, respects privacy controls)
+  - `GET /:id` — public user profile lookup
+- [x] `userValidators.js` — input validation rules for all profile, privacy, and notification routes.
+- [x] `userApi.js` — Axios wrapper module for user endpoints.
+- [x] `SettingsPage.jsx` — multi-tab interface:
+  - **Profile & Account**: Editable display name, debounced username availability checking, bio editor, local avatar preview via `FileReader`, read-only email status.
+  - **Appearance**: Integrated with `usePreferencesStore` (Light / Dark / System themes, Reduced Motion toggle).
+  - **Privacy & Security**: Online status toggle, last seen toggle, direct message permissions dropdown.
+  - **Notifications**: Email digest, desktop push, sound chimes, mention alerts.
+- [x] `UserProfileModal.jsx` — public profile card showing avatar, status, role badge, bio, and member since date.
+- [x] `AppLayout.jsx` updated to render user `displayName` or `username` in sidebar footer.
+- [x] All 55 tests passing across monorepo (34 backend integration + 21 frontend unit).
 - [x] ESLint passing clean (0 errors, 0 warnings) and production build succeeded.
