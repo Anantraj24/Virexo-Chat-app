@@ -33,3 +33,19 @@ export const searchLimiter = rateLimit({
     );
   },
 });
+
+export const apiLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 300, // Max 300 requests per IP per 5 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => env.isTest,
+  handler: (req, res) => {
+    res.status(429).json(
+      createApiResponse(false, null, {
+        code: 'TOO_MANY_REQUESTS',
+        message: 'Too many requests. Please try again later.',
+      })
+    );
+  },
+});

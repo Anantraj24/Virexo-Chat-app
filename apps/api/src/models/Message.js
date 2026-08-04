@@ -91,7 +91,7 @@ const messageSchema = new mongoose.Schema(
     idempotencyKey: {
       type: String,
       sparse: true,
-      index: true,
+      unique: true,
     },
     replyTo: {
       type: mongoose.Schema.Types.ObjectId,

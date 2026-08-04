@@ -18,6 +18,7 @@ import searchRoutes from './routes/searchRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import { apiLimiter } from './middleware/rateLimiter.js';
 
 // Validate environment on boot
 validateEnv();
@@ -88,11 +89,15 @@ app.get('/ready', (req, res) => {
 
 // API v1 Routes
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/search', searchRoutes);
+
+// Apply generic rate limiter to other routes
+app.use('/api/v1', apiLimiter);
+
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/conversations', conversationRoutes);
 app.use('/api/v1/messages', messageRoutes);
 app.use('/api/v1/media', mediaRoutes);
-app.use('/api/v1/search', searchRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/admin', adminRoutes);

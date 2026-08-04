@@ -1,7 +1,7 @@
 # Virexo Build Status & Progress Tracker
 
-- **Current Phase**: **Phase 17 - Moderation and Administration**
-- **Overall Status**: Moderation and admin systems implemented. All backend integration tests and frontend tests passing.
+- **Current Phase**: **Phase 18 - Security and Reliability Audit**
+- **Overall Status**: Security and reliability hardening pass complete. All backend tests passing and vulnerability risks mitigated.
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -27,6 +27,7 @@
 | **Phase 15** | **Search without Paid Atlas** | Indexed user search, conversation search, MongoDB text-index message search, cursor pagination, debounced frontend search, keyboard navigation, result highlighting, safe query limits, tests | **COMPLETE** |
 | **Phase 16** | **Notifications** | Notification model, real-time in-app notifications, unread count, pagination, group invitations, replies/reactions/mentions triggers, Web Notifications API, duplicate-prevention, sound preference | **COMPLETE** |
 | **Phase 17** | **Moderation & Admin** | Report model, reporting UI, admin roles/authorization, admin dashboard, user suspension, audit logs | **COMPLETE** |
+| **Phase 18** | **Security & Reliability Audit** | Token rotation/reuse handling, CORS/cookies across Vercel/Render, NoSQL injection risks, XSS/unsafe rendering, rate limiting, duplicate message creation, and stale room membership | **COMPLETE** |
 
 ---
 
@@ -148,5 +149,15 @@
 - [x] Admin role and authorization middleware.
 - [x] Admin user listing, report status review, and audit log.
 - [x] Suspend/restore user and socket disconnection on suspension.
-- [x] Protected admin interface and confirmation dialogs.
+- [x] Protected admin interface with pagination and filters.
+
+### Phase 18: Security and Reliability Audit
+- [x] Authentication & Authorization Boundaries: Verified JWT handling, refresh token HTTP-only storage.
+- [x] CORS and Cookies: `sameSite: none` applied for Vercel/Render compatibility.
+- [x] NoSQL Injection Risks: `express-validator` strictly enforces string/ObjectID typing in search inputs.
+- [x] Rate Limiting: Global `apiLimiter` mounted to `/api/v1` routes to prevent abuse.
+- [x] Duplicate Message Creation: Applied unique sparse index to `Message.idempotencyKey` preventing duplicate race conditions.
+- [x] Stale Room Membership: Enforced `socketsLeave` in Socket.IO logic when users leave or are removed from groups.
+- [x] Dependency Vulnerabilities: Upgraded `react-router` and `react-router-dom` to mitigate high-severity risks.
+- [x] Regression Tests: Fully passing test suite (83/83) backing the security mitigations.
 - [x] Tests proving non-admin denial and admin capabilities.

@@ -3,6 +3,7 @@ import { User } from '../models/User.js';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../utils/errors.js';
 import { createApiResponse } from '@virexo/shared';
 import { triggerNotification } from './notificationController.js';
+import { getIO } from '../socket/socketServer.js';
 
 // Helper: Populate member user details cleanly
 async function populateConversation(doc) {
@@ -318,6 +319,13 @@ export async function removeMember(req, res, next) {
     conversation.members = conversation.members.filter((m) => m.userId.toString() !== userId);
     await conversation.save();
 
+    // Force user's sockets to leave the conversation room
+    try {
+      getIO().in(`user:${userId}`).socketsLeave(`conversation:${id}`);
+    } catch (e) {
+      // Ignore socket errors in test mode
+    }
+
     res.status(200).json(
       createApiResponse(true, { message: isSelf ? 'You left the group' : 'Member removed successfully' })
     );
@@ -415,7 +423,17 @@ export async function leaveGroup(req, res, next) {
     }
 
     await conversation.save();
-    res.status(200).json(createApiResponse(true, { message: 'Left group successfully' }));
+
+    // Force user's sockets to leave the conversation room
+    try {
+      getIO().in(`user:${currentUserId}`).socketsLeave(`conversation:${id}`);
+    } catch (e) {
+      // Ignore socket errors in test mode
+    }
+
+    res.status(200).json(
+      createApiResponse(true, { message: 'You left the group successfully' })
+    );
   } catch (error) {
     next(error);
   }

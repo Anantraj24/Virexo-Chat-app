@@ -28,7 +28,7 @@ function setRefreshTokenCookie(res, token, expiresInDays) {
   res.cookie('refreshToken', token, {
     httpOnly: true,
     secure: env.isProduction,
-    sameSite: 'strict',
+    sameSite: env.isProduction ? 'none' : 'lax', // Support cross-origin Vercel/Render deployment
     maxAge: expiresInDays * 24 * 60 * 60 * 1000,
     path: '/api/v1/auth',
   });
