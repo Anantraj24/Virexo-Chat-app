@@ -13,7 +13,12 @@
     "build": "npm run build --workspaces",
     "lint": "npx --no-install eslint .",
     "lint:fix": "npx --no-install eslint . --fix",
-    "format": "npx prettier --write ."
+    "format": "npx prettier --write .",
+    "test": "npm run test:api && npm run test:web",
+    "test:api": "npm test -w apps/api",
+    "test:web": "npm test -w apps/web",
+    "test:e2e": "npx playwright test",
+    "test:ci": "npm run test:api && npm run test:web && npm run build -w apps/web"
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",

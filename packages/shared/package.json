@@ -8,6 +8,7 @@
     ".": "./src/index.js"
   },
   "scripts": {
-    "build": "echo \"Shared package ready\""
+    "build": "echo \"Shared package ready\"",
+    "test": "echo \"No tests for shared package\""
   }
 }

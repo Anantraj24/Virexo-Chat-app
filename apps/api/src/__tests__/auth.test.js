@@ -161,4 +161,52 @@ describe('Authentication API Integration Tests', () => {
     const dbUser = await User.findOne({ email: testUser.email });
     expect(dbUser.refreshTokenHashes.length).toBe(0);
   });
+
+  it('Multiple sequential refreshes should produce new cookies each time', async () => {
+    const signupRes = await request(app).post('/api/v1/auth/signup').send(testUser);
+    let currentCookie = signupRes.headers['set-cookie'];
+    const seenCookies = [];
+
+    for (let i = 0; i < 3; i++) {
+      const refreshRes = await request(app)
+        .post('/api/v1/auth/refresh')
+        .set('Cookie', currentCookie);
+
+      expect(refreshRes.status).toBe(200);
+      expect(refreshRes.body.data.accessToken).toBeDefined();
+
+      const newCookie = refreshRes.headers['set-cookie'];
+      // Each refresh should produce a different cookie (rotated token)
+      seenCookies.push(newCookie[0]);
+      currentCookie = newCookie;
+    }
+
+    // All cookies should be different from each other
+    const uniqueCookies = new Set(seenCookies);
+    expect(uniqueCookies.size).toBe(3);
+  });
+
+  it('POST /api/v1/auth/refresh without a cookie should return 401', async () => {
+    const res = await request(app).post('/api/v1/auth/refresh');
+    expect(res.status).toBe(401);
+  });
+
+  it('POST /api/v1/auth/refresh with a malformed cookie should return 401', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/refresh')
+      .set('Cookie', 'refreshToken=not_a_valid_jwt_at_all');
+    expect(res.status).toBe(401);
+  });
+
+  it('POST /api/v1/auth/signup should reject missing required fields', async () => {
+    const res = await request(app).post('/api/v1/auth/signup').send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('POST /api/v1/auth/login should reject missing password field', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'test@example.com' });
+    expect(res.status).toBe(400);
+  });
 });
