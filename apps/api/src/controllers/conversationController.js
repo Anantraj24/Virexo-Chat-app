@@ -2,6 +2,7 @@ import { Conversation } from '../models/Conversation.js';
 import { User } from '../models/User.js';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../utils/errors.js';
 import { createApiResponse } from '@virexo/shared';
+import { triggerNotification } from './notificationController.js';
 
 // Helper: Populate member user details cleanly
 async function populateConversation(doc) {
@@ -246,6 +247,15 @@ export async function addMembers(req, res, next) {
         role: 'member',
         joinedAt: new Date(),
       });
+      
+      triggerNotification({
+        recipientId: id,
+        actorId: currentUserId,
+        type: 'group_invite',
+        entityId: conversation._id,
+        entityModel: 'Conversation',
+        content: `You were added to the group "${conversation.name}"`,
+      }).catch(console.error);
     });
 
     await conversation.save();
@@ -345,6 +355,15 @@ export async function updateMemberRole(req, res, next) {
     targetMember.role = role;
     await conversation.save();
     await populateConversation(conversation);
+
+    triggerNotification({
+      recipientId: userId,
+      actorId: currentUserId,
+      type: 'role_change',
+      entityId: conversation._id,
+      entityModel: 'Conversation',
+      content: `Your role in "${conversation.name}" was updated to ${role}`,
+    }).catch(console.error);
 
     res.status(200).json(
       createApiResponse(true, {

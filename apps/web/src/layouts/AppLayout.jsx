@@ -13,6 +13,8 @@ import { CreateGroupModal } from '../components/CreateGroupModal';
 import { GroupSettingsModal } from '../components/GroupSettingsModal';
 import SearchModal from '../components/SearchModal';
 import { ConversationList } from '../components/chat/ConversationList';
+import { NotificationBell } from '../components/notifications/NotificationBell';
+import { useGlobalSocket } from '../hooks/useGlobalSocket';
 import {
   Settings,
   Menu,
@@ -33,6 +35,8 @@ export function AppLayout() {
   const { user, clearAuth } = useAuthStore();
   const { addToast } = useToast();
   const navigate = useNavigate();
+
+  useGlobalSocket();
 
   const [resendingEmail, setResendingEmail] = useState(false);
   const [conversations, setConversations] = useState([]);
@@ -211,6 +215,7 @@ export function AppLayout() {
           />
 
           <div className="flex items-center space-x-1">
+            <NotificationBell />
             <Dropdown
               trigger={
                 <button className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer">

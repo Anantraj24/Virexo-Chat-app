@@ -1,10 +1,12 @@
 import { Message } from '../models/Message.js';
 import { Conversation } from '../models/Conversation.js';
+import { User } from '../models/User.js';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors.js';
 import { createApiResponse, SOCKET_EVENTS } from '@virexo/shared';
 import { markRead } from '../services/receiptService.js';
 import { getIO } from '../socket/socketServer.js';
 import { deleteResource } from '../services/cloudinary.js';
+import { triggerNotification } from './notificationController.js';
 
 const DELETE_FOR_EVERYONE_WINDOW_MS = 2 * 60 * 1000;
 
@@ -30,7 +32,7 @@ async function verifyMessageAccess(messageId, currentUserId) {
 
 export async function createMessage(req, res, next) {
   try {
-    const { conversationId, content = '', attachments = [], idempotencyKey } = req.body;
+    const { conversationId, content = '', attachments = [], idempotencyKey, replyTo, forwardedFrom } = req.body;
     const currentUserId = req.user._id.toString();
 
     const conversation = await Conversation.findById(conversationId);
@@ -65,6 +67,8 @@ export async function createMessage(req, res, next) {
       content,
       attachments,
       idempotencyKey,
+      replyTo,
+      forwardedFrom,
       readBy: [{ userId: currentUserId, readAt: now }],
       audit: { createdBy: currentUserId },
     });
@@ -87,6 +91,45 @@ export async function createMessage(req, res, next) {
       });
     } catch {
       // Socket server may not be initialized in test mode
+    }
+
+    if (replyTo) {
+      const originalMessage = await Message.findById(replyTo);
+      if (originalMessage && originalMessage.senderId.toString() !== currentUserId) {
+        triggerNotification({
+          recipientId: originalMessage.senderId,
+          actorId: currentUserId,
+          type: 'message_reply',
+          entityId: message._id,
+          entityModel: 'Message',
+          content: `replied to your message in "${conversation.type === 'group' ? conversation.name : 'a direct message'}"`,
+        }).catch(console.error);
+      }
+    }
+
+    // Extract mentions @username
+    const mentionRegex = /@(\w+)/g;
+    const matches = [...content.matchAll(mentionRegex)];
+    if (matches.length > 0) {
+      const usernames = matches.map((m) => m[1]);
+      const mentionedUsers = await User.find({ username: { $in: usernames } });
+      
+      for (const mentionedUser of mentionedUsers) {
+        if (mentionedUser._id.toString() !== currentUserId) {
+          // Check if they are in the conversation
+          const isMember = conversation.members.some(m => m.userId.toString() === mentionedUser._id.toString());
+          if (isMember) {
+            triggerNotification({
+              recipientId: mentionedUser._id,
+              actorId: currentUserId,
+              type: 'mention',
+              entityId: message._id,
+              entityModel: 'Message',
+              content: `mentioned you in "${conversation.type === 'group' ? conversation.name : 'a direct message'}"`,
+            }).catch(console.error);
+          }
+        }
+      }
     }
 
     res.status(201).json(createApiResponse(true, { message, isExisting: false }));
@@ -574,6 +617,17 @@ export async function addReaction(req, res, next) {
       );
     } catch {
       // Ignore if socket IO server is not booted in test mode
+    }
+
+    if (!existingReaction && message.senderId._id.toString() !== currentUserId) {
+      triggerNotification({
+        recipientId: message.senderId._id,
+        actorId: currentUserId,
+        type: 'message_reaction',
+        entityId: message._id,
+        entityModel: 'Message',
+        content: `reacted ${emoji} to your message`,
+      }).catch(console.error);
     }
 
     res.status(200).json(createApiResponse(true, { message, action: existingReaction ? 'removed' : 'added' }));

@@ -7,6 +7,7 @@ export const API_ROUTES = {
   USERS: '/api/v1/users',
   CONVERSATIONS: '/api/v1/conversations',
   MESSAGES: '/api/v1/messages',
+  NOTIFICATIONS: '/api/v1/notifications',
 };
 
 export const HTTP_STATUS = {
@@ -41,6 +42,8 @@ export const SOCKET_EVENTS = {
   RECEIPT_UPDATE: 'receipt:update',
   UNREAD_UPDATE: 'unread:update',
   RECEIPTS_SYNC: 'sync:receipts',
+  NOTIFICATION_NEW: 'notification:new',
+  NOTIFICATION_READ: 'notification:read',
 };
 
 export const createApiResponse = (success, data = null, error = null) => ({

@@ -1,8 +1,8 @@
 # Virexo Build Status & Progress Tracker
 
 ## 1. Executive Status Summary
-- **Current Phase**: **Phase 14 - Secure Media Messaging**
-- **Overall Status**: Secure media messaging implemented (Cloudinary, Multer, API, frontend upload UI, MediaRecorder voice notes, attachment rendering). All backend integration tests and frontend tests passing.
+- **Current Phase**: **Phase 16 - Notifications**
+- **Overall Status**: Secure media messaging, search functionality, and notification system implemented. All backend integration tests and frontend tests passing.
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -25,6 +25,8 @@
 | **Phase 12** | **Main Chat Interface** | Responsive three-region desktop layout, mobile route-based navigation, conversation list with unread badges, chat header with online/last-seen, virtualized message list with date separators, cursor-based upward pagination with scroll preservation, message composer with optimistic sending & retry, real-time incoming messages via WebSocket, typing indicator, sent/delivered/read icons, empty/loading/error states | **COMPLETE** |
 | **Phase 13** | **Advanced Message Operations** | Edit message, delete for self/everyone (with 2m window), reply, forward, pin/unpin, reactions, message action menu, real-time sync via sockets, optimistic UI updates with rollback | **COMPLETE** |
 | **Phase 14** | **Secure Media Messaging** | Cloudinary service adapter, Multer memory storage, signed/controlled upload API, validation, attachment message schema, image preview, video/audio players, PDF/file cards, browser MediaRecorder voice notes, tests | **COMPLETE** |
+| **Phase 15** | **Search without Paid Atlas** | Indexed user search, conversation search, MongoDB text-index message search, cursor pagination, debounced frontend search, keyboard navigation, result highlighting, safe query limits, tests | **COMPLETE** |
+| **Phase 16** | **Notifications** | Notification model, real-time in-app notifications, unread count, pagination, group invitations, replies/reactions/mentions triggers, Web Notifications API, duplicate-prevention, sound preference | **COMPLETE** |
 
 ---
 
@@ -115,3 +117,27 @@
 - [x] Backend integration tests for all operations.
 - [x] Real-time synchronization and socket broadcasting for all actions (`MESSAGE_EDITED`, `MESSAGE_DELETED`, `MESSAGE_PINNED`, `MESSAGE_REACTION_ADDED`, etc.).
 - [x] Optimistic updates for edit and forward operations.
+
+### Phase 14: Secure Media Messaging
+- [x] Cloudinary service adapter and Multer memory storage.
+- [x] Signed/controlled upload API with file-size and MIME allowlists.
+- [x] Image preview, video/audio players, PDF/file cards.
+- [x] Browser MediaRecorder voice notes with timer and preview.
+- [x] Secure download behavior and tests.
+
+### Phase 15: Search without Paid Atlas
+- [x] Indexed user search and conversation search.
+- [x] MongoDB text-index message search.
+- [x] Filters by conversation, sender, date and attachment type with cursor pagination.
+- [x] Debounced frontend search with keyboard navigation and safe query limits.
+- [x] Result highlighting without unsafe HTML and jump-to-message behavior.
+- [x] Search rate limits and tests.
+
+### Phase 16: Notifications
+- [x] Notification model and real-time in-app notifications.
+- [x] Unread notification count and notification list with pagination.
+- [x] Mark one/all as read.
+- [x] Triggers for group invitations, role-change, reactions, replies, and mentions.
+- [x] Web Notifications API for active browser sessions and duplicate-notification prevention.
+- [x] Sound preference with accessible defaults (Web Audio API).
+- [x] Tests covering backend API and state.
