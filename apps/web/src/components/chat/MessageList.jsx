@@ -6,6 +6,7 @@ import { EmptyState } from '../ui/EmptyState';
 import { Avatar } from '../ui/Avatar';
 import { MessageStatus } from './MessageStatus';
 import { DateSeparator } from './DateSeparator';
+import { MessageActionMenu } from './MessageActionMenu';
 import { cn } from '../../lib/utils';
 
 const MESSAGE_GROUP_GAP_MS = 120000;
@@ -16,17 +17,6 @@ function formatMessageTime(timestamp) {
 
 function isSameDay(date1, date2) {
   return date1.toDateString() === date2.toDateString();
-}
-
-function getDateLabel(timestamp) {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  if (isSameDay(date, now)) return 'Today';
-  if (isSameDay(date, yesterday)) return 'Yesterday';
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function shouldShowDateSeparator(currentMsg, prevMsg) {
@@ -45,10 +35,22 @@ function shouldGroupWithPrevious(currentMsg, prevMsg) {
   return diffMs < MESSAGE_GROUP_GAP_MS;
 }
 
-const MessageItem = ({ message, isSelf, formatTime }) => {
+function formatReplyPreview(message, allMessages) {
+  if (!message.replyTo) return null;
+  const replyMessage = allMessages.find((m) => m._id === message.replyTo);
+  if (!replyMessage) return null;
+  const sender = replyMessage.senderId || { username: 'Unknown', displayName: 'Unknown' };
+  const content = replyMessage.isDeleted ? '[This message was deleted]' : (replyMessage.content || '[Attachment]');
+  return { senderName: sender.displayName || sender.username, content: content.substring(0, 60) };
+}
+
+const MessageItem = ({ message, isSelf, formatTime, currentUser, allMessages, onEdit, onDelete, onDeleteForEveryone, onReply, onPin, onUnpin, onReaction }) => {
   const sender = message.senderId || { username: 'Unknown', displayName: 'Unknown' };
   const showAvatar = !isSelf;
   const timeStr = message.createdAt ? formatTime(message.createdAt) : '';
+  const replyPreview = formatReplyPreview(message, allMessages);
+  const reactions = message.reactions || [];
+  const reactionSummary = reactions.length > 0 ? reactions : [];
 
   return (
     <div
@@ -73,10 +75,18 @@ const MessageItem = ({ message, isSelf, formatTime }) => {
             {sender.displayName || sender.username}
           </span>
         )}
-        <div className="flex items-center space-x-2 mt-0.5">
-          {isSelf && (
-            <span className="text-[10px] text-zinc-500 order-2">{timeStr}</span>
-          )}
+
+        {replyPreview && (
+          <div className={cn(
+            'text-[10px] px-2 py-1 rounded-lg border mb-1',
+            isSelf ? 'border-zinc-700 bg-zinc-800/50 text-zinc-400' : 'border-indigo-500/30 bg-indigo-500/10 text-indigo-400'
+          )}>
+            <span className="font-semibold">{replyPreview.senderName}</span>
+            <span className="mx-1">{replyPreview.content}</span>
+          </div>
+        )}
+
+        <div className={cn('flex items-center space-x-2 mt-0.5', isSelf && 'flex-row-reverse')}>
           <span
             className={cn(
               'text-xs leading-relaxed',
@@ -85,12 +95,34 @@ const MessageItem = ({ message, isSelf, formatTime }) => {
           >
             {message.content || '[Attachment]'}
           </span>
-          {!isSelf && (
-            <span className="text-[10px] text-zinc-500">{timeStr}</span>
+          {message.isEdited && (
+            <span className="text-[10px] text-zinc-600" title="Edited">(edited)</span>
           )}
           {isSelf && !message.isDeleted && (
             <MessageStatus status={message.status || 'sent'} />
           )}
+          {!isSelf && (
+            <span className="text-[10px] text-zinc-500">{timeStr}</span>
+          )}
+          {message.isPinned && (
+            <span className="text-[10px] text-amber-400 shrink-0" title="Pinned">📌</span>
+          )}
+          {reactionSummary.length > 0 && (
+            <span className="text-[10px] text-zinc-500 shrink-0">
+              {reactionSummary.map((r) => r.emoji).join(' ')}
+            </span>
+          )}
+          <MessageActionMenu
+            message={message}
+            currentUser={currentUser}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onDeleteForEveryone={onDeleteForEveryone}
+            onReply={onReply}
+            onPin={onPin}
+            onUnpin={onUnpin}
+            onReaction={onReaction}
+          />
         </div>
       </div>
     </div>
@@ -110,6 +142,13 @@ export function MessageList({
   containerRef,
   onScroll,
   messagesEndRef,
+  onEdit,
+  onDelete,
+  onDeleteForEveryone,
+  onReply,
+  onPin,
+  onUnpin,
+  onReaction,
 }) {
   const scrollContainerRef = useRef(null);
 
@@ -121,31 +160,6 @@ export function MessageList({
       };
     }
   }, [onScroll]);
-
-  const groupedMessages = useMemo(() => {
-    const groups = [];
-    let currentGroup = [];
-    let lastDateLabel = null;
-
-    messages.forEach((msg, index) => {
-      const dateLabel = formatDateSeparator(msg.createdAt);
-      const showDateSep = dateLabel !== lastDateLabel;
-
-      if (showDateSep && currentGroup.length > 0) {
-        groups.push({ type: 'date-separator', label: lastDateLabel, key: `date-${lastDateLabel}-${index}` });
-        currentGroup = [];
-      }
-
-      currentGroup.push(msg);
-      lastDateLabel = dateLabel;
-    });
-
-    if (currentGroup.length > 0 && lastDateLabel) {
-      groups.push({ type: 'date-separator', label: lastDateLabel, key: `date-${lastDateLabel}-end` });
-    }
-
-    return groups;
-  }, [messages, formatDateSeparator]);
 
   return (
     <div
@@ -197,18 +211,10 @@ export function MessageList({
             </div>
           )}
 
-          {groupedMessages.map((group) => {
-            if (group.type === 'date-separator') {
-              return <DateSeparator key={group.key} date={group.label} />;
-            }
-            return null;
-          })}
-
           {messages.map((msg, index) => {
             const isSelf = msg.senderId?._id === currentUser?._id;
             const prevMsg = index > 0 ? messages[index - 1] : null;
             const showDateSep = shouldShowDateSeparator(msg, prevMsg);
-            const showAvatar = !isSelf && !shouldGroupWithPrevious(msg, prevMsg);
 
             return (
               <div key={msg._id}>
@@ -219,6 +225,15 @@ export function MessageList({
                   message={msg}
                   isSelf={isSelf}
                   formatTime={formatTime}
+                  currentUser={currentUser}
+                  allMessages={messages}
+                  onEdit={() => onEdit?.(msg._id)}
+                  onDelete={() => onDelete?.(msg._id)}
+                  onDeleteForEveryone={() => onDeleteForEveryone?.(msg._id)}
+                  onReply={() => onReply?.(msg)}
+                  onPin={() => onPin?.(msg._id)}
+                  onUnpin={() => onUnpin?.(msg._id)}
+                  onReaction={(emoji) => onReaction?.(msg._id, emoji)}
                 />
               </div>
             );

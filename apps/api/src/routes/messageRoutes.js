@@ -4,29 +4,45 @@ import {
   getMessageHistory,
   markConversationRead,
   deleteMessage,
+  editMessage,
+  deleteMessageForEveryone,
+  pinMessage,
+  unpinMessage,
+  addReaction,
+  removeReaction,
 } from '../controllers/messageController.js';
 import {
   createMessageRules,
   getMessageHistoryRules,
   deleteMessageRules,
   markReadRules,
+  editMessageRules,
+  deleteForEveryoneRules,
+  pinMessageRules,
+  unpinMessageRules,
+  addReactionRules,
+  removeReactionRules,
 } from '../middleware/messageValidators.js';
 import { authenticate } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
-// All message endpoints require authentication
 router.use(authenticate);
 
-// Create message (rate limited)
 router.post('/', authLimiter, createMessageRules, createMessage);
 
-// History & Read tracking
 router.get('/conversation/:conversationId', getMessageHistoryRules, getMessageHistory);
 router.post('/conversation/:conversationId/read', markReadRules, markConversationRead);
 
-// Soft delete
+router.put('/:id', editMessageRules, editMessage);
 router.delete('/:id', deleteMessageRules, deleteMessage);
+router.delete('/:id/everyone', deleteForEveryoneRules, deleteMessageForEveryone);
+
+router.post('/:id/pin', pinMessageRules, pinMessage);
+router.delete('/:id/pin', unpinMessageRules, unpinMessage);
+
+router.post('/:id/reactions', addReactionRules, addReaction);
+router.delete('/:id/reactions', removeReactionRules, removeReaction);
 
 export default router;

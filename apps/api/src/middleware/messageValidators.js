@@ -18,7 +18,14 @@ export const createMessageRules = [
     .trim()
     .isLength({ max: 100 })
     .withMessage('Idempotency key is too long'),
-  // Custom validator to ensure either content or attachments exist
+  body('replyTo')
+    .optional()
+    .isMongoId()
+    .withMessage('ReplyTo must be a valid MongoDB ObjectId'),
+  body('forwardedFrom')
+    .optional()
+    .isMongoId()
+    .withMessage('ForwardedFrom must be a valid MongoDB ObjectId'),
   body().custom((value, { req }) => {
     const hasContent = req.body.content && req.body.content.trim().length > 0;
     const hasAttachments = Array.isArray(req.body.attachments) && req.body.attachments.length > 0;
@@ -57,5 +64,76 @@ export const markReadRules = [
   param('conversationId')
     .isMongoId()
     .withMessage('Invalid conversation ID'),
+  handleValidationErrors,
+];
+
+export const editMessageRules = [
+  param('id')
+    .isMongoId()
+    .withMessage('Invalid message ID'),
+  body('content')
+    .trim()
+    .notEmpty()
+    .withMessage('Message content is required')
+    .isLength({ max: 2000 })
+    .withMessage('Message content cannot exceed 2000 characters'),
+  handleValidationErrors,
+];
+
+export const deleteForEveryoneRules = [
+  param('id')
+    .isMongoId()
+    .withMessage('Invalid message ID'),
+  handleValidationErrors,
+];
+
+export const pinMessageRules = [
+  param('id')
+    .isMongoId()
+    .withMessage('Invalid message ID'),
+  handleValidationErrors,
+];
+
+export const unpinMessageRules = [
+  param('id')
+    .isMongoId()
+    .withMessage('Invalid message ID'),
+  handleValidationErrors,
+];
+
+export const addReactionRules = [
+  param('id')
+    .isMongoId()
+    .withMessage('Invalid message ID'),
+  body('emoji')
+    .trim()
+    .notEmpty()
+    .withMessage('Emoji is required')
+    .isLength({ max: 2 })
+    .withMessage('Emoji must be a single character or emoji'),
+  handleValidationErrors,
+];
+
+export const removeReactionRules = [
+  param('id')
+    .isMongoId()
+    .withMessage('Invalid message ID'),
+  body('emoji')
+    .trim()
+    .notEmpty()
+    .withMessage('Emoji is required'),
+  handleValidationErrors,
+];
+
+export const forwardMessageRules = [
+  param('id')
+    .isMongoId()
+    .withMessage('Invalid message ID'),
+  body('conversationId')
+    .trim()
+    .notEmpty()
+    .withMessage('Target conversation ID is required')
+    .isMongoId()
+    .withMessage('Target conversation ID must be a valid MongoDB ObjectId'),
   handleValidationErrors,
 ];

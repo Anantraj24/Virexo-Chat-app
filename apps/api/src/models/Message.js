@@ -39,6 +39,31 @@ const readBySchema = new mongoose.Schema(
   { _id: false }
 );
 
+const auditSchema = new mongoose.Schema(
+  {
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    editedAt: { type: Date },
+    editedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    deletedAt: { type: Date },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    deletionScope: {
+      type: String,
+      enum: ['self', 'everyone'],
+      default: 'self',
+    },
+  },
+  { _id: false }
+);
+
 const messageSchema = new mongoose.Schema(
   {
     conversationId: {
@@ -67,6 +92,16 @@ const messageSchema = new mongoose.Schema(
       sparse: true,
       index: true,
     },
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message',
+      default: null,
+    },
+    forwardedFrom: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message',
+      default: null,
+    },
     reactions: {
       type: [reactionSchema],
       default: [],
@@ -83,6 +118,19 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isPinned: {
+      type: Boolean,
+      default: false,
+    },
+    pinnedAt: { type: Date },
+    pinnedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    audit: {
+      type: auditSchema,
+      default: () => ({ createdBy: null }),
+    },
   },
   {
     timestamps: true,
@@ -92,5 +140,6 @@ const messageSchema = new mongoose.Schema(
 // Compound indexes for reverse chronological cursor pagination & text search
 messageSchema.index({ conversationId: 1, createdAt: -1 });
 messageSchema.index({ content: 'text' });
+messageSchema.index({ isPinned: -1, createdAt: -1 });
 
 export const Message = mongoose.model('Message', messageSchema);

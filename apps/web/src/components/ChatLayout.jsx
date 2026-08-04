@@ -48,6 +48,13 @@ export function ChatLayout() {
         containerRef={chat.containerRef}
         onScroll={chat.handleScroll}
         messagesEndRef={chat.messagesEndRef}
+        onEdit={chat.handleEditMessage}
+        onDelete={chat.handleDeleteMessage}
+        onDeleteForEveryone={chat.handleDeleteForEveryone}
+        onReply={(msg) => chat.setReplyingTo(msg)}
+        onPin={chat.handlePinMessage}
+        onUnpin={chat.handleUnpinMessage}
+        onReaction={chat.handleAddReaction}
       />
 
       <TypingIndicator typingUsers={chat.typingUsers} />
@@ -59,6 +66,8 @@ export function ChatLayout() {
         sending={chat.sending}
         failedMessages={chat.failedMessages}
         onRetryFailed={chat.handleRetryFailed}
+        replyingTo={chat.replyingTo}
+        onCancelReply={() => chat.setReplyingTo(null)}
       />
     </div>
   );

@@ -4,7 +4,18 @@ import { useToast } from '../components/ui/Toast';
 import { useSocketStore } from '../store/useSocketStore';
 import { socketClientManager } from '../lib/socketClient';
 import { SOCKET_EVENTS } from '@virexo/shared';
-import { getMessageHistoryRequest, sendMessageRequest, markReadRequest } from '../api/messageApi';
+import {
+  getMessageHistoryRequest,
+  sendMessageRequest,
+  markReadRequest,
+  editMessageRequest,
+  deleteMessageRequest,
+  deleteMessageForEveryoneRequest,
+  pinMessageRequest,
+  unpinMessageRequest,
+  addReactionRequest,
+  removeReactionRequest,
+} from '../api/messageApi';
 import { getConversationRequest } from '../api/conversationApi';
 
 const PAGE_SIZE = 50;
@@ -29,6 +40,9 @@ export function useChat(conversationId) {
 
   const [optimisticMessages, setOptimisticMessages] = useState([]);
   const [failedMessages, setFailedMessages] = useState([]);
+
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [editingMessage, setEditingMessage] = useState(null);
 
   const messagesEndRef = useRef(null);
   const containerRef = useRef(null);
@@ -106,7 +120,7 @@ export function useChat(conversationId) {
       }
     };
 
-    const handleDeletedMessage = ({ messageId, conversationId: eventConvId }) => {
+    const handleDeletedMessage = ({ messageId, conversationId: eventConvId, deletionScope }) => {
       if (eventConvId === cid) {
         setMessages((prev) =>
           prev.map((m) =>
@@ -134,6 +148,61 @@ export function useChat(conversationId) {
       }
     };
 
+    const handleMessageEdited = ({ messageId, conversationId: eventConvId, content, isEdited, editedAt }) => {
+      if (eventConvId === cid) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m._id === messageId ? { ...m, content, isEdited, editedAt } : m
+          )
+        );
+      }
+    };
+
+    const handleMessagePinned = ({ messageId, conversationId: eventConvId }) => {
+      if (eventConvId === cid) {
+        setMessages((prev) =>
+          prev.map((m) => (m._id === messageId ? { ...m, isPinned: true } : m))
+        );
+      }
+    };
+
+    const handleMessageUnpinned = ({ messageId, conversationId: eventConvId }) => {
+      if (eventConvId === cid) {
+        setMessages((prev) =>
+          prev.map((m) => (m._id === messageId ? { ...m, isPinned: false } : m))
+        );
+      }
+    };
+
+    const handleReactionAdded = ({ messageId, conversationId: eventConvId, emoji, userId }) => {
+      if (eventConvId === cid) {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m._id !== messageId) return m;
+            const existing = m.reactions.find((r) => r.emoji === emoji && r.userId.toString() === userId);
+            if (existing) return m;
+            return { ...m, reactions: [...m.reactions, { emoji, userId }] };
+          })
+        );
+      }
+    };
+
+    const handleReactionRemoved = ({ messageId, conversationId: eventConvId, emoji, userId }) => {
+      if (eventConvId === cid) {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m._id !== messageId) return m;
+            return {
+              ...m,
+              reactions: m.reactions.filter(
+                (r) => !(r.emoji === emoji && r.userId.toString() === userId)
+              ),
+            };
+          })
+        );
+      }
+    };
+
     const handleReceiptUpdate = ({ conversationId: eventConvId, receipts }) => {
       if (eventConvId === cid) {
         useSocketStore.getState().syncReceiptState({ [eventConvId]: receipts });
@@ -144,6 +213,11 @@ export function useChat(conversationId) {
     socket.on(SOCKET_EVENTS.MESSAGE_DELETED, handleDeletedMessage);
     socket.on(SOCKET_EVENTS.MESSAGE_DELIVERED, handleMessageDelivered);
     socket.on(SOCKET_EVENTS.MESSAGE_READ, handleMessageRead);
+    socket.on(SOCKET_EVENTS.MESSAGE_EDITED, handleMessageEdited);
+    socket.on(SOCKET_EVENTS.MESSAGE_PINNED, handleMessagePinned);
+    socket.on(SOCKET_EVENTS.MESSAGE_UNPINNED, handleMessageUnpinned);
+    socket.on(SOCKET_EVENTS.MESSAGE_REACTION_ADDED, handleReactionAdded);
+    socket.on(SOCKET_EVENTS.MESSAGE_REACTION_REMOVED, handleReactionRemoved);
     socket.on(SOCKET_EVENTS.RECEIPT_UPDATE, handleReceiptUpdate);
 
     return () => {
@@ -151,6 +225,11 @@ export function useChat(conversationId) {
       socket.off(SOCKET_EVENTS.MESSAGE_DELETED, handleDeletedMessage);
       socket.off(SOCKET_EVENTS.MESSAGE_DELIVERED, handleMessageDelivered);
       socket.off(SOCKET_EVENTS.MESSAGE_READ, handleMessageRead);
+      socket.off(SOCKET_EVENTS.MESSAGE_EDITED, handleMessageEdited);
+      socket.off(SOCKET_EVENTS.MESSAGE_PINNED, handleMessagePinned);
+      socket.off(SOCKET_EVENTS.MESSAGE_UNPINNED, handleMessageUnpinned);
+      socket.off(SOCKET_EVENTS.MESSAGE_REACTION_ADDED, handleReactionAdded);
+      socket.off(SOCKET_EVENTS.MESSAGE_REACTION_REMOVED, handleReactionRemoved);
       socket.off(SOCKET_EVENTS.RECEIPT_UPDATE, handleReceiptUpdate);
       socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, { conversationId: cid });
     };
@@ -204,6 +283,7 @@ export function useChat(conversationId) {
 
     setInputText('');
     setSending(true);
+    setReplyingTo(null);
 
     const socket = socketClientManager.getSocket();
     if (socket) {
@@ -219,6 +299,10 @@ export function useChat(conversationId) {
       createdAt: new Date().toISOString(),
       isDeleted: false,
       idempotencyKey,
+      replyTo: replyingTo?._id || null,
+      reactions: [],
+      isEdited: false,
+      isPinned: false,
     };
 
     setOptimisticMessages((prev) => [...prev, optimisticMsg]);
@@ -230,6 +314,7 @@ export function useChat(conversationId) {
         conversationId: cid,
         content,
         idempotencyKey,
+        replyTo: replyingTo?._id || null,
       });
 
       const newMsg = res.data.message;
@@ -245,7 +330,7 @@ export function useChat(conversationId) {
     } finally {
       setSending(false);
     }
-  }, [inputText, sending, currentUser, scrollToBottom, addToast]);
+  }, [inputText, sending, currentUser, scrollToBottom, addToast, replyingTo]);
 
   const handleRetryMessage = useCallback(async (failedMsg) => {
     const cid = conversationIdRef.current;
@@ -264,6 +349,10 @@ export function useChat(conversationId) {
       createdAt: new Date().toISOString(),
       isDeleted: false,
       idempotencyKey: failedMsg.idempotencyKey,
+      replyTo: replyingTo?._id || null,
+      reactions: [],
+      isEdited: false,
+      isPinned: false,
     };
 
     setMessages((prev) => [...prev, optimisticMsg]);
@@ -274,6 +363,7 @@ export function useChat(conversationId) {
         conversationId: cid,
         content: failedMsg.content,
         idempotencyKey: failedMsg.idempotencyKey,
+        replyTo: replyingTo?._id || null,
       });
 
       const newMsg = res.data.message;
@@ -282,12 +372,185 @@ export function useChat(conversationId) {
       setTimeout(scrollToBottom, 50);
     } catch (err) {
       setMessages((prev) => prev.filter((m) => m._id !== tempId));
+      setOptimisticMessages((prev) => prev.filter((m) => m._id !== tempId));
       setFailedMessages((prev) => [...prev, { content: failedMsg.content, idempotencyKey: failedMsg.idempotencyKey, error: err.message || 'Failed to send' }]);
       addToast({ message: 'Message failed to send again.', type: 'error' });
     } finally {
       setSending(false);
     }
-  }, [currentUser, scrollToBottom, addToast]);
+  }, [currentUser, scrollToBottom, addToast, replyingTo]);
+
+  const handleEditMessage = useCallback(async (messageId, newContent) => {
+    const cid = conversationIdRef.current;
+    if (!cid) return;
+
+    const previousContent = messages.find((m) => m._id === messageId)?.content;
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        m._id === messageId ? { ...m, content: newContent, isEdited: true } : m
+      )
+    );
+
+    try {
+      await editMessageRequest(messageId, { content: newContent });
+      addToast({ message: 'Message edited', type: 'info' });
+    } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m._id === messageId ? { ...m, content: previousContent, isEdited: false } : m
+        )
+      );
+      addToast({ message: err.message || 'Failed to edit message', type: 'error' });
+    }
+  }, [messages, addToast]);
+
+  const handleDeleteMessage = useCallback(async (messageId) => {
+    const cid = conversationIdRef.current;
+    if (!cid) return;
+
+    const previousMessage = messages.find((m) => m._id === messageId);
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        m._id === messageId
+          ? { ...m, isDeleted: true, content: '[This message was deleted]', attachments: [] }
+          : m
+      )
+    );
+
+    try {
+      await deleteMessageRequest(messageId);
+    } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) => (m._id === messageId ? previousMessage : m))
+      );
+      addToast({ message: err.message || 'Failed to delete message', type: 'error' });
+    }
+  }, [messages, addToast]);
+
+  const handleDeleteForEveryone = useCallback(async (messageId) => {
+    const cid = conversationIdRef.current;
+    if (!cid) return;
+
+    const previousMessage = messages.find((m) => m._id === messageId);
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        m._id === messageId
+          ? { ...m, isDeleted: true, content: '[This message was deleted]', attachments: [] }
+          : m
+      )
+    );
+
+    try {
+      await deleteMessageForEveryoneRequest(messageId);
+      addToast({ message: 'Message deleted for everyone', type: 'info' });
+    } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) => (m._id === messageId ? previousMessage : m))
+      );
+      addToast({ message: err.message || 'Failed to delete message for everyone', type: 'error' });
+    }
+  }, [messages, addToast]);
+
+  const handlePinMessage = useCallback(async (messageId) => {
+    const cid = conversationIdRef.current;
+    if (!cid) return;
+
+    const previousMessage = messages.find((m) => m._id === messageId);
+
+    setMessages((prev) =>
+      prev.map((m) => (m._id === messageId ? { ...m, isPinned: true } : m))
+    );
+
+    try {
+      await pinMessageRequest(messageId);
+      addToast({ message: 'Message pinned', type: 'info' });
+    } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) => (m._id === messageId ? previousMessage : m))
+      );
+      addToast({ message: err.message || 'Failed to pin message', type: 'error' });
+    }
+  }, [messages, addToast]);
+
+  const handleUnpinMessage = useCallback(async (messageId) => {
+    const cid = conversationIdRef.current;
+    if (!cid) return;
+
+    const previousMessage = messages.find((m) => m._id === messageId);
+
+    setMessages((prev) =>
+      prev.map((m) => (m._id === messageId ? { ...m, isPinned: false } : m))
+    );
+
+    try {
+      await unpinMessageRequest(messageId);
+      addToast({ message: 'Message unpinned', type: 'info' });
+    } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) => (m._id === messageId ? previousMessage : m))
+      );
+      addToast({ message: err.message || 'Failed to unpin message', type: 'error' });
+    }
+  }, [messages, addToast]);
+
+  const handleAddReaction = useCallback(async (messageId, emoji) => {
+    const cid = conversationIdRef.current;
+    if (!cid) return;
+
+    const previousReactions = messages.find((m) => m._id === messageId)?.reactions || [];
+
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m._id !== messageId) return m;
+        const existing = m.reactions.find((r) => r.emoji === emoji && r.userId.toString() === currentUser?._id);
+        if (existing) {
+          return {
+            ...m,
+            reactions: m.reactions.filter((r) => !(r.emoji === emoji && r.userId.toString() === currentUser?._id)),
+          };
+        }
+        return { ...m, reactions: [...m.reactions, { emoji, userId: currentUser?._id }] };
+      })
+    );
+
+    try {
+      await addReactionRequest(messageId, { emoji });
+    } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) => (m._id === messageId ? { ...m, reactions: previousReactions } : m))
+      );
+      addToast({ message: err.message || 'Failed to add reaction', type: 'error' });
+    }
+  }, [messages, currentUser, addToast]);
+
+  const handleRemoveReaction = useCallback(async (messageId, emoji) => {
+    const cid = conversationIdRef.current;
+    if (!cid) return;
+
+    const previousReactions = messages.find((m) => m._id === messageId)?.reactions || [];
+
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m._id !== messageId) return m;
+        return {
+          ...m,
+          reactions: m.reactions.filter((r) => !(r.emoji === emoji && r.userId.toString() === currentUser?._id)),
+        };
+      })
+    );
+
+    try {
+      await removeReactionRequest(messageId, { emoji });
+    } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) => (m._id === messageId ? { ...m, reactions: previousReactions } : m))
+      );
+      addToast({ message: err.message || 'Failed to remove reaction', type: 'error' });
+    }
+  }, [messages, currentUser, addToast]);
 
   const handleInputChange = useCallback((e) => {
     setInputText(e.target.value);
@@ -358,6 +621,21 @@ export function useChat(conversationId) {
     return `Last seen ${lastSeenDate.toLocaleDateString()}`;
   }, []);
 
+  const getMessageReactions = useCallback((message) => {
+    if (!message?.reactions) return [];
+    const reactionMap = {};
+    message.reactions.forEach((r) => {
+      if (!reactionMap[r.emoji]) {
+        reactionMap[r.emoji] = { emoji: r.emoji, count: 0, userReacted: false };
+      }
+      reactionMap[r.emoji].count++;
+      if (r.userId.toString() === currentUser?._id) {
+        reactionMap[r.emoji].userReacted = true;
+      }
+    });
+    return Object.values(reactionMap);
+  }, [currentUser]);
+
   return {
     conversation,
     messages,
@@ -380,6 +658,13 @@ export function useChat(conversationId) {
     handleSendMessage,
     handleRetryMessage,
     handleRetryFailed,
+    handleEditMessage,
+    handleDeleteMessage,
+    handleDeleteForEveryone,
+    handlePinMessage,
+    handleUnpinMessage,
+    handleAddReaction,
+    handleRemoveReaction,
     handleInputChange,
     handleScroll,
     getRecipient,
@@ -387,5 +672,10 @@ export function useChat(conversationId) {
     formatTime,
     formatLastSeen,
     setInputText,
+    replyingTo,
+    setReplyingTo,
+    editingMessage,
+    setEditingMessage,
+    getMessageReactions,
   };
 }

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { Send, XCircle, RotateCcw } from 'lucide-react';
+import { Send, XCircle, RotateCcw, ArrowLeft } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 export function MessageComposer({
@@ -11,6 +11,8 @@ export function MessageComposer({
   onRetryFailed,
   disabled,
   placeholder = 'Type a message...',
+  replyingTo,
+  onCancelReply,
 }) {
   const inputRef = useRef(null);
 
@@ -20,6 +22,21 @@ export function MessageComposer({
 
   return (
     <div className="pt-3 border-t border-zinc-800/80 mt-2 shrink-0">
+      {replyingTo && (
+        <div className="flex items-center justify-between px-2 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg mb-2">
+          <div className="flex items-center space-x-2 text-xs text-indigo-400">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Replying to <strong>{replyingTo.senderId?.displayName || replyingTo.senderId?.username || 'Unknown'}</strong></span>
+          </div>
+          <button
+            onClick={onCancelReply}
+            className="text-zinc-500 hover:text-white p-0.5 transition cursor-pointer"
+          >
+            <XCircle className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {failedMessages.length > 0 && (
         <div className="flex flex-wrap gap-2 px-2 py-2">
           {failedMessages.map((msg) => (
