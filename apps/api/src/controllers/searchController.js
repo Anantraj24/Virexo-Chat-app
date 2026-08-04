@@ -82,7 +82,7 @@ export async function searchMessages(req, res, next) {
       .limit(maxLimit)
       .populate('senderId', '_id username displayName avatarUrl status role')
       .populate('conversationId', '_id name type')
-      .exec();
+      .lean();
 
     const nextCursor =
       messages.length === maxLimit ? messages[messages.length - 1].createdAt.toISOString() : null;
@@ -110,7 +110,7 @@ export async function searchUsers(req, res, next) {
     )
       .sort({ score: { $meta: 'textScore' } })
       .limit(maxLimit)
-      .exec();
+      .lean();
 
     const sanitizedUsers = users.map(formatPublicProfile);
 
@@ -143,7 +143,7 @@ export async function searchConversations(req, res, next) {
       .limit(maxLimit)
       .populate('members.userId', '_id username displayName avatarUrl status role')
       .populate('lastMessageId')
-      .exec();
+      .lean();
 
     res.status(200).json(createApiResponse(true, { conversations }));
   } catch (error) {

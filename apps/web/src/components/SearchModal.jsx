@@ -12,8 +12,8 @@ import {
   Video, 
   Mic 
 } from 'lucide-react';
-import { api } from '../lib/api';
-import useAuthStore from '../store/useAuthStore';
+import { apiClient as api } from '../api/axiosClient';
+import { useAuthStore } from '../store/useAuthStore';
 import { cn } from '../lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 

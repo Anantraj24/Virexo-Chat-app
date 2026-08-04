@@ -12,6 +12,8 @@ const attachmentSchema = new mongoose.Schema(
     filename: { type: String, required: true },
     size: { type: Number, required: true },
     duration: { type: Number },
+    width: { type: Number },
+    height: { type: Number },
   },
   { _id: false }
 );

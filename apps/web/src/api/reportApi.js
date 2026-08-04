@@ -1,9 +1,9 @@
 import { API_ROUTES } from '@virexo/shared';
-import axiosInstance from './axiosInstance';
+import { apiClient } from './axiosClient';
 
 export const reportApi = {
-  createReport: async (reportData) => {
-    const response = await axiosInstance.post(API_ROUTES.REPORTS.BASE, reportData);
+  createReport: async (data) => {
+    const response = await apiClient.post(`${API_ROUTES.REPORTS}`, data);
     return response.data;
   },
 };

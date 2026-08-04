@@ -167,7 +167,7 @@ export async function getMessageHistory(req, res, next) {
         path: 'senderId',
         select: '_id username displayName avatarUrl status role',
       })
-      .exec();
+      .lean();
 
     const hasNextPage = rawMessages.length > limit;
     const itemsDesc = hasNextPage ? rawMessages.slice(0, limit) : rawMessages;
@@ -176,7 +176,7 @@ export async function getMessageHistory(req, res, next) {
     const otherMembers = conversation.members.filter((m) => m.userId.toString() !== currentUserId);
 
     const items = itemsDesc.reverse().map((msgDoc) => {
-      const msgObj = msgDoc.toObject();
+      const msgObj = typeof msgDoc.toObject === 'function' ? msgDoc.toObject() : { ...msgDoc };
       const msgDate = new Date(msgObj.createdAt);
 
       if (msgObj.senderId._id.toString() === currentUserId) {
@@ -247,7 +247,7 @@ export async function getMessagesAround(req, res, next) {
         path: 'senderId',
         select: '_id username displayName avatarUrl status role',
       })
-      .exec();
+      .lean();
 
     // Fetch up to 20 messages newer than target
     const newerMessages = await Message.find({
@@ -261,7 +261,7 @@ export async function getMessagesAround(req, res, next) {
         path: 'senderId',
         select: '_id username displayName avatarUrl status role',
       })
-      .exec();
+      .lean();
 
     await targetMessage.populate({
       path: 'senderId',
@@ -278,7 +278,7 @@ export async function getMessagesAround(req, res, next) {
     const otherMembers = conversation.members.filter((m) => m.userId.toString() !== currentUserId);
 
     const items = combinedDesc.reverse().map((msgDoc) => {
-      const msgObj = typeof msgDoc.toObject === 'function' ? msgDoc.toObject() : msgDoc;
+      const msgObj = typeof msgDoc.toObject === 'function' ? msgDoc.toObject() : { ...msgDoc };
       const msgDate = new Date(msgObj.createdAt);
 
       if (msgObj.senderId._id.toString() === currentUserId) {

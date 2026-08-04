@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { adminApi } from '../../api/adminApi';
-import { useAuth } from '../../store/useAuth';
+import { useAuthStore } from '../../store/useAuthStore';
 import { useNavigate, Navigate } from 'react-router-dom';
 
 const AdminDashboard = () => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('users');
   const [data, setData] = useState([]);

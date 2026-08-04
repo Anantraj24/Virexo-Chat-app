@@ -129,7 +129,7 @@ export async function listConversations(req, res, next) {
         path: 'members.userId',
         select: '_id username displayName avatarUrl status bio role',
       })
-      .exec();
+      .lean();
 
     const hasNextPage = conversations.length > limit;
     const items = hasNextPage ? conversations.slice(0, limit) : conversations;

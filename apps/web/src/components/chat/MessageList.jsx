@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useMemo } from 'react';
+import { useRef, useEffect, useCallback, useMemo, memo, useState } from 'react';
 import { ArrowUp } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
@@ -45,14 +45,21 @@ function formatReplyPreview(message, allMessages) {
   return { senderName: sender.displayName || sender.username, content: content.substring(0, 60) };
 }
 
-function MessageAttachment({ attachment }) {
+const MessageAttachment = memo(({ attachment }) => {
   if (!attachment) return null;
 
   if (attachment.type === 'image') {
     return (
       <div className="mt-2 max-w-sm rounded-lg overflow-hidden border border-zinc-800">
-        <a href={attachment.url} target="_blank" rel="noopener noreferrer">
-          <img src={attachment.url} alt="attachment" className="w-full h-auto max-h-64 object-cover" loading="lazy" />
+        <a href={attachment.url} target="_blank" rel="noopener noreferrer" aria-label={`View image ${attachment.filename || ''}`}>
+          <img 
+            src={attachment.url} 
+            alt={attachment.filename || "attachment"} 
+            className="w-full h-auto max-h-64 object-cover bg-zinc-800" 
+            loading="lazy" 
+            width={attachment.width} 
+            height={attachment.height} 
+          />
         </a>
       </div>
     );
@@ -61,7 +68,7 @@ function MessageAttachment({ attachment }) {
   if (attachment.type === 'video') {
     return (
       <div className="mt-2 max-w-sm rounded-lg overflow-hidden border border-zinc-800 bg-black">
-        <video src={attachment.url} controls className="w-full h-auto max-h-64" preload="metadata" />
+        <video src={attachment.url} controls className="w-full h-auto max-h-64" preload="metadata" aria-label={`Video ${attachment.filename || ''}`} />
       </div>
     );
   }
@@ -69,7 +76,7 @@ function MessageAttachment({ attachment }) {
   if (attachment.type === 'audio') {
     return (
       <div className="mt-2 max-w-sm rounded-full overflow-hidden border border-zinc-800 bg-zinc-900 px-3 py-2">
-        <audio src={attachment.url} controls className="h-8 w-full max-w-[240px]" preload="metadata" />
+        <audio src={attachment.url} controls className="h-8 w-full max-w-[240px]" preload="metadata" aria-label={`Audio ${attachment.filename || ''}`} />
       </div>
     );
   }
@@ -88,15 +95,18 @@ function MessageAttachment({ attachment }) {
         href={attachment.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="w-8 h-8 rounded-full bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center text-zinc-300 transition shrink-0"
+        aria-label={`Download ${attachment.filename || 'Document'}`}
+        className="w-8 h-8 rounded-full bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center text-zinc-300 transition shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-500"
       >
         <Download className="w-4 h-4" />
       </a>
     </div>
   );
-}
+});
 
-const MessageItem = ({ message, isSelf, formatTime, currentUser, allMessages, onEdit, onDelete, onDeleteForEveryone, onReply, onPin, onUnpin, onReaction, onForward }) => {
+MessageAttachment.displayName = 'MessageAttachment';
+
+const MessageItem = memo(({ message, isSelf, formatTime, currentUser, allMessages, onEdit, onDelete, onDeleteForEveryone, onReply, onPin, onUnpin, onReaction, onForward, onReport }) => {
   const sender = message.senderId || { username: 'Unknown', displayName: 'Unknown' };
   const showAvatar = !isSelf;
   const timeStr = message.createdAt ? formatTime(message.createdAt) : '';
@@ -177,21 +187,23 @@ const MessageItem = ({ message, isSelf, formatTime, currentUser, allMessages, on
           <MessageActionMenu
             message={message}
             currentUser={currentUser}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onDeleteForEveryone={onDeleteForEveryone}
-            onReply={onReply}
-            onPin={onPin}
-            onUnpin={onUnpin}
-            onReaction={onReaction}
-            onForward={onForward}
-            onReport={onReport}
+            onEdit={() => onEdit?.(message._id)}
+            onDelete={() => onDelete?.(message._id)}
+            onDeleteForEveryone={() => onDeleteForEveryone?.(message._id)}
+            onReply={() => onReply?.(message)}
+            onPin={() => onPin?.(message._id)}
+            onUnpin={() => onUnpin?.(message._id)}
+            onReaction={(emoji) => onReaction?.(message._id, emoji)}
+            onForward={() => onForward?.(message)}
+            onReport={() => onReport?.(message)}
           />
         </div>
       </div>
     </div>
   );
-};
+});
+
+MessageItem.displayName = 'MessageItem';
 
 export function MessageList({
   messages,
@@ -217,21 +229,54 @@ export function MessageList({
   onReport,
 }) {
   const scrollContainerRef = useRef(null);
+  const [announcement, setAnnouncement] = useState('');
 
   useEffect(() => {
-    if (scrollContainerRef.current && onScroll) {
-      scrollContainerRef.current.addEventListener('scroll', onScroll, { passive: true });
-      return () => {
-        scrollContainerRef.current?.removeEventListener('scroll', onScroll);
-      };
+    if (messages.length > 0) {
+      const latestMsg = messages[messages.length - 1];
+      const isSelf = latestMsg.senderId?._id === currentUser?._id;
+      
+      if (!isSelf && !latestMsg.isDeleted) {
+        const senderName = latestMsg.senderId?.displayName || latestMsg.senderId?.username || 'someone';
+        setAnnouncement(`New message from ${senderName}`);
+        
+        // Clear announcement to allow same string to be announced again if needed
+        const timer = setTimeout(() => setAnnouncement(''), 3000);
+        return () => clearTimeout(timer);
+      }
     }
+  }, [messages, currentUser]);
+
+  const handleScroll = useCallback((e) => {
+    if (onScroll) onScroll(e);
   }, [onScroll]);
 
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (el) {
+      el.addEventListener('scroll', handleScroll, { passive: true });
+      return () => {
+        el.removeEventListener('scroll', handleScroll);
+      };
+    }
+  }, [handleScroll]);
+
   return (
-    <div
-      ref={scrollContainerRef}
-      className="flex-1 overflow-y-auto space-y-1 p-2"
-    >
+    <>
+      <div 
+        aria-live="polite" 
+        className="sr-only"
+        role="status"
+        aria-atomic="true"
+      >
+        {announcement}
+      </div>
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto space-y-1 p-2"
+        role="log"
+        aria-label="Message history"
+      >
       {loading ? (
         <div className="space-y-4 py-4">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -293,23 +338,24 @@ export function MessageList({
                   formatTime={formatTime}
                   currentUser={currentUser}
                   allMessages={messages}
-                  onEdit={() => onEdit?.(msg._id)}
-                  onDelete={() => onDelete?.(msg._id)}
-                  onDeleteForEveryone={() => onDeleteForEveryone?.(msg._id)}
-                  onReply={() => onReply?.(msg)}
-                  onPin={() => onPin?.(msg._id)}
-                  onUnpin={() => onUnpin?.(msg._id)}
-                  onReaction={(emoji) => onReaction?.(msg._id, emoji)}
-                  onForward={() => onForward?.(msg)}
-                  onReport={() => onReport?.(msg)}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onDeleteForEveryone={onDeleteForEveryone}
+                  onReply={onReply}
+                  onPin={onPin}
+                  onUnpin={onUnpin}
+                  onReaction={onReaction}
+                  onForward={onForward}
+                  onReport={onReport}
                 />
               </div>
             );
           })}
 
-          <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} tabIndex="-1" />
         </>
       )}
     </div>
+    </>
   );
 }

@@ -39,6 +39,12 @@ export async function uploadMedia(req, res, next) {
     if (result.duration) {
       attachment.duration = result.duration;
     }
+    if (result.width) {
+      attachment.width = result.width;
+    }
+    if (result.height) {
+      attachment.height = result.height;
+    }
 
     res.status(201).json(createApiResponse(true, { attachment }));
   } catch (error) {
