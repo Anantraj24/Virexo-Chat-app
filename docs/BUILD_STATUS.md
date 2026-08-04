@@ -1,8 +1,8 @@
 # Virexo Build Status & Progress Tracker
 
 ## 1. Executive Status Summary
-- **Current Phase**: **Phase 12 - Main Chat Interface**
-- **Overall Status**: Responsive three-region desktop layout with sidebar conversation list, mobile route-based navigation, chat header with online/last-seen, efficient message list with date separators and cursor-based upward pagination with scroll position preservation, message composer with optimistic sending and failed/retry state, real-time incoming messages via WebSocket, typing indicator, sent/delivered/read status icons, unread badges, empty/loading/error states, and all 31 frontend tests passing. Production build succeeds with no errors.
+- **Current Phase**: **Phase 13 - Advanced Message Operations**
+- **Overall Status**: Advanced message operations implemented (edit, delete for self/everyone, pin/unpin, reactions, forward). Real-time synchronization and optimistic updates supported. All backend integration tests and frontend tests passing.
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -23,6 +23,7 @@
 | **Phase 10** | **Real-Time Engine (Socket.IO & Presence)** | Socket.IO server bootstrap, JWT handshake auth, user & conversation room scoping, multi-tab presence tracking with 30s write throttling, typing start/stop with 5s auto-expiry, event contracts in `@virexo/shared`, single Render instance isolation with documented Redis adapter boundary, frontend socket client singleton, Zustand socket store, Vitest socket integration tests | **COMPLETE** |
 | **Phase 11** | **Delivery and Read State** | Per-user embedded member cursors, receipt event contracts, privacy-aware read receipt suppression, unread count calculations, reconnect synchronization, status tick indicators, Vitest integration & unit test suites | **COMPLETE** |
 | **Phase 12** | **Main Chat Interface** | Responsive three-region desktop layout, mobile route-based navigation, conversation list with unread badges, chat header with online/last-seen, virtualized message list with date separators, cursor-based upward pagination with scroll preservation, message composer with optimistic sending & retry, real-time incoming messages via WebSocket, typing indicator, sent/delivered/read icons, empty/loading/error states | **COMPLETE** |
+| **Phase 13** | **Advanced Message Operations** | Edit message, delete for self/everyone (with 2m window), reply, forward, pin/unpin, reactions, message action menu, real-time sync via sockets, optimistic UI updates with rollback | **COMPLETE** |
 
 ---
 
@@ -102,3 +103,14 @@
 - [x] Empty, loading, and error states for message list.
 - [x] Auto-scroll rules (scroll to bottom only when user is near bottom).
 - [x] All existing 31 frontend tests passing.
+
+### Phase 13: Advanced Message Operations
+- [x] Edit message with edited indicator, validation, and real-time broadcast.
+- [x] Delete for self (soft delete) and Delete for everyone (with 2-minute time window and permission policy).
+- [x] Forwarding messages via `ForwardMessageModal` to other conversations.
+- [x] Pin and unpin messages (restricted to owners/admins in groups).
+- [x] Add and remove emoji reactions on messages.
+- [x] `MessageActionMenu` UI component for triggering all operations.
+- [x] Backend integration tests for all operations.
+- [x] Real-time synchronization and socket broadcasting for all actions (`MESSAGE_EDITED`, `MESSAGE_DELETED`, `MESSAGE_PINNED`, `MESSAGE_REACTION_ADDED`, etc.).
+- [x] Optimistic updates for edit and forward operations.

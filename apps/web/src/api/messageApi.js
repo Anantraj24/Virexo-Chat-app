@@ -35,3 +35,6 @@ export const addReactionRequest = (messageId, { emoji }) =>
 
 export const removeReactionRequest = (messageId, { emoji }) =>
   apiClient.delete(`${MSG_BASE}/${messageId}/reactions`, { data: { emoji } });
+
+export const forwardMessageRequest = (messageId, { targetConversationId }) =>
+  apiClient.post(`${MSG_BASE}/${messageId}/forward`, { targetConversationId });

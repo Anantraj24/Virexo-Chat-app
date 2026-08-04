@@ -43,6 +43,7 @@ export function useChat(conversationId) {
 
   const [replyingTo, setReplyingTo] = useState(null);
   const [editingMessage, setEditingMessage] = useState(null);
+  const [forwardingMessage, setForwardingMessage] = useState(null);
 
   const messagesEndRef = useRef(null);
   const containerRef = useRef(null);
@@ -380,7 +381,16 @@ export function useChat(conversationId) {
     }
   }, [currentUser, scrollToBottom, addToast, replyingTo]);
 
-  const handleEditMessage = useCallback(async (messageId, newContent) => {
+  const handleEditMessage = useCallback((messageId) => {
+    const msg = messages.find((m) => m._id === messageId);
+    if (msg) setEditingMessage(msg);
+  }, [messages]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingMessage(null);
+  }, []);
+
+  const submitEditMessage = useCallback(async (messageId, newContent) => {
     const cid = conversationIdRef.current;
     if (!cid) return;
 
@@ -391,10 +401,10 @@ export function useChat(conversationId) {
         m._id === messageId ? { ...m, content: newContent, isEdited: true } : m
       )
     );
+    setEditingMessage(null);
 
     try {
       await editMessageRequest(messageId, { content: newContent });
-      addToast({ message: 'Message edited', type: 'info' });
     } catch (err) {
       setMessages((prev) =>
         prev.map((m) =>
@@ -675,7 +685,10 @@ export function useChat(conversationId) {
     replyingTo,
     setReplyingTo,
     editingMessage,
-    setEditingMessage,
+    handleCancelEdit,
+    submitEditMessage,
+    forwardingMessage,
+    setForwardingMessage,
     getMessageReactions,
   };
 }

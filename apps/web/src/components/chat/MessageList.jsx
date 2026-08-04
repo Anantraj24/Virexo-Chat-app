@@ -44,7 +44,7 @@ function formatReplyPreview(message, allMessages) {
   return { senderName: sender.displayName || sender.username, content: content.substring(0, 60) };
 }
 
-const MessageItem = ({ message, isSelf, formatTime, currentUser, allMessages, onEdit, onDelete, onDeleteForEveryone, onReply, onPin, onUnpin, onReaction }) => {
+const MessageItem = ({ message, isSelf, formatTime, currentUser, allMessages, onEdit, onDelete, onDeleteForEveryone, onReply, onPin, onUnpin, onReaction, onForward }) => {
   const sender = message.senderId || { username: 'Unknown', displayName: 'Unknown' };
   const showAvatar = !isSelf;
   const timeStr = message.createdAt ? formatTime(message.createdAt) : '';
@@ -122,6 +122,7 @@ const MessageItem = ({ message, isSelf, formatTime, currentUser, allMessages, on
             onPin={onPin}
             onUnpin={onUnpin}
             onReaction={onReaction}
+            onForward={onForward}
           />
         </div>
       </div>
@@ -149,6 +150,7 @@ export function MessageList({
   onPin,
   onUnpin,
   onReaction,
+  onForward,
 }) {
   const scrollContainerRef = useRef(null);
 
@@ -234,6 +236,7 @@ export function MessageList({
                   onPin={() => onPin?.(msg._id)}
                   onUnpin={() => onUnpin?.(msg._id)}
                   onReaction={(emoji) => onReaction?.(msg._id, emoji)}
+                  onForward={() => onForward?.(msg)}
                 />
               </div>
             );

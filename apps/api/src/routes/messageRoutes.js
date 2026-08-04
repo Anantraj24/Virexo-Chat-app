@@ -10,6 +10,7 @@ import {
   unpinMessage,
   addReaction,
   removeReaction,
+  forwardMessage,
 } from '../controllers/messageController.js';
 import {
   createMessageRules,
@@ -22,6 +23,7 @@ import {
   unpinMessageRules,
   addReactionRules,
   removeReactionRules,
+  forwardMessageRules,
 } from '../middleware/messageValidators.js';
 import { authenticate } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
@@ -44,5 +46,7 @@ router.delete('/:id/pin', unpinMessageRules, unpinMessage);
 
 router.post('/:id/reactions', addReactionRules, addReaction);
 router.delete('/:id/reactions', removeReactionRules, removeReaction);
+
+router.post('/:id/forward', forwardMessageRules, forwardMessage);
 
 export default router;

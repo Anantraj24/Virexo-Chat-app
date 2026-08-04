@@ -3,6 +3,7 @@ import { ChatHeader } from './chat/ChatHeader';
 import { MessageList } from './chat/MessageList';
 import { MessageComposer } from './chat/MessageComposer';
 import { TypingIndicator } from './chat/TypingIndicator';
+import { ForwardMessageModal } from './chat/ForwardMessageModal';
 import { useParams } from 'react-router-dom';
 
 export function ChatLayout() {
@@ -55,6 +56,7 @@ export function ChatLayout() {
         onPin={chat.handlePinMessage}
         onUnpin={chat.handleUnpinMessage}
         onReaction={chat.handleAddReaction}
+        onForward={(msg) => chat.setForwardingMessage(msg)}
       />
 
       <TypingIndicator typingUsers={chat.typingUsers} />
@@ -68,6 +70,15 @@ export function ChatLayout() {
         onRetryFailed={chat.handleRetryFailed}
         replyingTo={chat.replyingTo}
         onCancelReply={() => chat.setReplyingTo(null)}
+        editingMessage={chat.editingMessage}
+        onCancelEdit={chat.handleCancelEdit}
+        onSubmitEdit={chat.submitEditMessage}
+      />
+
+      <ForwardMessageModal
+        isOpen={!!chat.forwardingMessage}
+        onClose={() => chat.setForwardingMessage(null)}
+        message={chat.forwardingMessage}
       />
     </div>
   );
