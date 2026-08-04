@@ -17,3 +17,19 @@ export const authLimiter = rateLimit({
     );
   },
 });
+
+export const searchLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30, // Max 30 search requests per IP per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => env.isTest,
+  handler: (req, res) => {
+    res.status(429).json(
+      createApiResponse(false, null, {
+        code: 'TOO_MANY_REQUESTS',
+        message: 'Too many search requests. Please try again after a minute.',
+      })
+    );
+  },
+});

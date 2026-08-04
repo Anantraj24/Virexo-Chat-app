@@ -83,6 +83,7 @@ const conversationSchema = new mongoose.Schema(
 // Indexes
 conversationSchema.index({ 'members.userId': 1, updatedAt: -1 });
 conversationSchema.index({ type: 1, isPrivate: 1 });
+conversationSchema.index({ name: 'text', description: 'text' });
 
 // Helper static function to compute directKey for 1-on-1 chats
 conversationSchema.statics.generateDirectKey = function (userId1, userId2) {

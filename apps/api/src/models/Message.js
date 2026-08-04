@@ -138,8 +138,9 @@ const messageSchema = new mongoose.Schema(
   }
 );
 
-// Compound indexes for reverse chronological cursor pagination & text search
+// Indexes
 messageSchema.index({ conversationId: 1, createdAt: -1 });
+messageSchema.index({ senderId: 1, createdAt: -1 });
 messageSchema.index({ content: 'text' });
 messageSchema.index({ isPinned: -1, createdAt: -1 });
 

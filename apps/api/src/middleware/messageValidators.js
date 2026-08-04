@@ -53,6 +53,16 @@ export const getMessageHistoryRules = [
   handleValidationErrors,
 ];
 
+export const getMessagesAroundRules = [
+  param('conversationId')
+    .isMongoId()
+    .withMessage('Invalid conversation ID'),
+  param('messageId')
+    .isMongoId()
+    .withMessage('Invalid message ID'),
+  handleValidationErrors,
+];
+
 export const deleteMessageRules = [
   param('id')
     .isMongoId()

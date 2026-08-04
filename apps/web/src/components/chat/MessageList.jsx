@@ -106,6 +106,7 @@ const MessageItem = ({ message, isSelf, formatTime, currentUser, allMessages, on
 
   return (
     <div
+      id={`message-${message._id}`}
       className={cn(
         'group flex items-start space-x-3 p-2 rounded-xl hover:bg-zinc-900/50 transition',
         isSelf && 'flex-row-reverse space-x-reverse'

@@ -12,6 +12,10 @@ export const getMessageHistoryRequest = (conversationId, { cursor, limit = 50 } 
   return apiClient.get(`${MSG_BASE}/conversation/${conversationId}?${query.toString()}`);
 };
 
+export const getMessagesAroundRequest = (conversationId, messageId) => {
+  return apiClient.get(`${MSG_BASE}/conversation/${conversationId}/around/${messageId}`);
+};
+
 export const markReadRequest = (conversationId) =>
   apiClient.post(`${MSG_BASE}/conversation/${conversationId}/read`);
 

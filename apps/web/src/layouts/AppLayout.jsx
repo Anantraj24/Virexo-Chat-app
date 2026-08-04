@@ -11,6 +11,7 @@ import { Dropdown } from '../components/ui/Dropdown';
 import { NewDMModal } from '../components/NewDMModal';
 import { CreateGroupModal } from '../components/CreateGroupModal';
 import { GroupSettingsModal } from '../components/GroupSettingsModal';
+import SearchModal from '../components/SearchModal';
 import { ConversationList } from '../components/chat/ConversationList';
 import {
   Settings,
@@ -39,7 +40,19 @@ export function AppLayout() {
 
   const [dmModalOpen, setDmModalOpen] = useState(false);
   const [groupModalOpen, setGroupModalOpen] = useState(false);
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [activeGroupSettings, setActiveGroupSettings] = useState(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSearchModalOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const fetchConversations = useCallback(async () => {
     setLoadingConversations(true);
@@ -276,6 +289,31 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      <SearchModal
+        isOpen={searchModalOpen}
+        onClose={() => setSearchModalOpen(false)}
+        onJumpToMessage={(conversationId, messageId) => {
+          setSearchModalOpen(false);
+          // Navigate to channel with jump params (will be handled by useChat)
+          navigate(`/channels/${conversationId}?jumpTo=${messageId}`);
+        }}
+        onStartConversation={async (targetId, isConversationId = false) => {
+          setSearchModalOpen(false);
+          if (isConversationId) {
+            navigate(`/channels/${targetId}`);
+          } else {
+            // Need to start DM or navigate to existing
+            try {
+              const res = await api.post('/conversations/direct', { partnerId: targetId });
+              await fetchConversations();
+              navigate(`/dms/${res.data.conversation._id}`);
+            } catch (err) {
+              addToast({ message: err.response?.data?.message || 'Failed to start conversation', type: 'error' });
+            }
+          }
+        }}
+      />
 
       {/* Modals */}
       <NewDMModal

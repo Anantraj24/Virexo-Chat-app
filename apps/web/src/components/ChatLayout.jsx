@@ -4,11 +4,14 @@ import { MessageList } from './chat/MessageList';
 import { MessageComposer } from './chat/MessageComposer';
 import { TypingIndicator } from './chat/TypingIndicator';
 import { ForwardMessageModal } from './chat/ForwardMessageModal';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 
 export function ChatLayout() {
   const { id } = useParams();
-  const chat = useChat(id);
+  const [searchParams] = useSearchParams();
+  const jumpTo = searchParams.get('jumpTo');
+  
+  const chat = useChat(id, jumpTo);
 
   if (!id) {
     return (

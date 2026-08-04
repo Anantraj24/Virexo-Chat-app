@@ -15,6 +15,7 @@ import {
   unpinMessageRequest,
   addReactionRequest,
   removeReactionRequest,
+  getMessagesAroundRequest,
 } from '../api/messageApi';
 import { uploadMediaRequest } from '../api/mediaApi';
 import { getConversationRequest } from '../api/conversationApi';
@@ -23,7 +24,7 @@ const PAGE_SIZE = 50;
 const TYPING_TIMEOUT_MS = 2000;
 const SCROLL_THRESHOLD = 100;
 
-export function useChat(conversationId) {
+export function useChat(conversationId, jumpToMessageId = null) {
   const { user: currentUser } = useAuthStore();
   const { addToast } = useToast();
   const typingUsers = useSocketStore((state) => state.getTypingUsersForConversation(conversationId));
@@ -54,8 +55,10 @@ export function useChat(conversationId) {
   const isNearBottomRef = useRef(true);
   const prevScrollHeightRef = useRef(0);
   const conversationIdRef = useRef(conversationId);
+  const jumpToMessageIdRef = useRef(jumpToMessageId);
 
   conversationIdRef.current = conversationId;
+  jumpToMessageIdRef.current = jumpToMessageId;
 
   const scrollToBottom = useCallback((behavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
@@ -69,15 +72,20 @@ export function useChat(conversationId) {
 
   const loadConversationData = useCallback(async () => {
     const cid = conversationIdRef.current;
+    const jid = jumpToMessageIdRef.current;
     if (!cid) return;
     setLoading(true);
     setError(null);
 
     try {
-      const [convRes, historyRes] = await Promise.all([
-        getConversationRequest(cid),
-        getMessageHistoryRequest(cid, { limit: PAGE_SIZE }),
-      ]);
+      let historyRes;
+      const convRes = await getConversationRequest(cid);
+
+      if (jid) {
+        historyRes = await getMessagesAroundRequest(cid, jid);
+      } else {
+        historyRes = await getMessageHistoryRequest(cid, { limit: PAGE_SIZE });
+      }
 
       setConversation(convRes.data.conversation);
       setMessages(historyRes.data.messages || []);
@@ -103,7 +111,19 @@ export function useChat(conversationId) {
 
   useEffect(() => {
     if (!loading && messages.length > 0) {
-      scrollToBottom('auto');
+      if (jumpToMessageIdRef.current) {
+        // Find the message element and scroll to it
+        setTimeout(() => {
+          const el = document.getElementById(`message-${jumpToMessageIdRef.current}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'auto', block: 'center' });
+            el.classList.add('bg-primary/10', 'transition-colors', 'duration-1000');
+            setTimeout(() => el.classList.remove('bg-primary/10'), 2000);
+          }
+        }, 100);
+      } else {
+        scrollToBottom('auto');
+      }
     }
   }, [loading, messages.length, scrollToBottom]);
 

@@ -172,6 +172,92 @@ export async function getMessageHistory(req, res, next) {
   }
 }
 
+export async function getMessagesAround(req, res, next) {
+  try {
+    const { conversationId, messageId } = req.params;
+    const currentUserId = req.user._id.toString();
+
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      throw new NotFoundError('Conversation not found', 'CONVERSATION_NOT_FOUND');
+    }
+
+    const member = conversation.members.find((m) => m.userId.toString() === currentUserId);
+    if (!member) {
+      throw new ForbiddenError('You are not a member of this conversation', 'NOT_A_MEMBER');
+    }
+
+    const targetMessage = await Message.findById(messageId);
+    if (!targetMessage || targetMessage.conversationId.toString() !== conversationId) {
+      throw new NotFoundError('Message not found in this conversation', 'MESSAGE_NOT_FOUND');
+    }
+
+    // Fetch up to 20 messages older than target
+    const olderMessages = await Message.find({
+      conversationId,
+      createdAt: { $lt: targetMessage.createdAt },
+      isDeleted: false
+    })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .populate({
+        path: 'senderId',
+        select: '_id username displayName avatarUrl status role',
+      })
+      .exec();
+
+    // Fetch up to 20 messages newer than target
+    const newerMessages = await Message.find({
+      conversationId,
+      createdAt: { $gt: targetMessage.createdAt },
+      isDeleted: false
+    })
+      .sort({ createdAt: 1 })
+      .limit(20)
+      .populate({
+        path: 'senderId',
+        select: '_id username displayName avatarUrl status role',
+      })
+      .exec();
+
+    await targetMessage.populate({
+      path: 'senderId',
+      select: '_id username displayName avatarUrl status role',
+    });
+
+    // Combine them (older need to be reversed to chronological)
+    const combinedDesc = [
+      ...newerMessages.reverse(),
+      targetMessage,
+      ...olderMessages,
+    ];
+
+    const otherMembers = conversation.members.filter((m) => m.userId.toString() !== currentUserId);
+
+    const items = combinedDesc.reverse().map((msgDoc) => {
+      const msgObj = typeof msgDoc.toObject === 'function' ? msgDoc.toObject() : msgDoc;
+      const msgDate = new Date(msgObj.createdAt);
+
+      if (msgObj.senderId._id.toString() === currentUserId) {
+        const isReadByOthers = otherMembers.some((m) => m.lastReadAt && new Date(m.lastReadAt) >= msgDate);
+        const isDeliveredToOthers = otherMembers.some((m) => m.lastDeliveredAt && new Date(m.lastDeliveredAt) >= msgDate);
+
+        msgObj.status = isReadByOthers ? 'read' : isDeliveredToOthers ? 'delivered' : 'sent';
+      } else {
+        msgObj.status = 'delivered';
+      }
+
+      return msgObj;
+    });
+
+    const nextCursor = olderMessages.length === 20 ? olderMessages[olderMessages.length - 1].createdAt.toISOString() : null;
+
+    res.status(200).json(createApiResponse(true, { messages: items, nextCursor, targetId: targetMessage._id }));
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function markConversationRead(req, res, next) {
   try {
     const { conversationId } = req.params;
@@ -590,7 +676,10 @@ export async function forwardMessage(req, res, next) {
     targetMember.lastDeliveredAt = now;
     await targetConversation.save();
 
-    await populateMessage(forwardedMessage);
+    await forwardedMessage.populate({
+      path: 'senderId',
+      select: '_id username displayName avatarUrl status role',
+    });
 
     // Broadcast real-time message:new event to target conversation room
     try {

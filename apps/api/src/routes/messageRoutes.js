@@ -11,6 +11,7 @@ import {
   addReaction,
   removeReaction,
   forwardMessage,
+  getMessagesAround,
 } from '../controllers/messageController.js';
 import {
   createMessageRules,
@@ -24,6 +25,7 @@ import {
   addReactionRules,
   removeReactionRules,
   forwardMessageRules,
+  getMessagesAroundRules,
 } from '../middleware/messageValidators.js';
 import { authenticate } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
@@ -35,6 +37,7 @@ router.use(authenticate);
 router.post('/', authLimiter, createMessageRules, createMessage);
 
 router.get('/conversation/:conversationId', getMessageHistoryRules, getMessageHistory);
+router.get('/conversation/:conversationId/around/:messageId', getMessagesAroundRules, getMessagesAround);
 router.post('/conversation/:conversationId/read', markReadRules, markConversationRead);
 
 router.put('/:id', editMessageRules, editMessage);
