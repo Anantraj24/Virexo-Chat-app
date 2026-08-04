@@ -7,6 +7,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { usePreferencesStore, applyThemeToDocument } from './store/usePreferencesStore';
 import { useAuthStore } from './store/useAuthStore';
 import { refreshRequest, getMeRequest } from './api/authApi';
+import Notifications from './pages/Notifications';
+import AdminDashboard from './pages/admin/AdminDashboard';
 
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { GuestRoute } from './components/GuestRoute';
@@ -95,6 +97,8 @@ export default function App() {
                   <Route path="channels/:id" element={<ChannelPage />} />
                   <Route path="dms/:id" element={<DirectMessagePage />} />
                   <Route path="settings" element={<SettingsPage />} />
+                  <Route path="notifications" element={<Notifications />} />
+                  <Route path="admin" element={<AdminDashboard />} />
                 </Route>
 
                 {/* Public Authentication Layout (Guest Only for login/register) */}

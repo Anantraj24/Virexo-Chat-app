@@ -185,6 +185,7 @@ const MessageItem = ({ message, isSelf, formatTime, currentUser, allMessages, on
             onUnpin={onUnpin}
             onReaction={onReaction}
             onForward={onForward}
+            onReport={onReport}
           />
         </div>
       </div>
@@ -213,6 +214,7 @@ export function MessageList({
   onUnpin,
   onReaction,
   onForward,
+  onReport,
 }) {
   const scrollContainerRef = useRef(null);
 
@@ -299,6 +301,7 @@ export function MessageList({
                   onUnpin={() => onUnpin?.(msg._id)}
                   onReaction={(emoji) => onReaction?.(msg._id, emoji)}
                   onForward={() => onForward?.(msg)}
+                  onReport={() => onReport?.(msg)}
                 />
               </div>
             );

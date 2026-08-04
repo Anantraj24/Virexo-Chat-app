@@ -57,6 +57,11 @@ const userSchema = new mongoose.Schema(
       enum: ['user', 'admin'],
       default: 'user',
     },
+    accountStatus: {
+      type: String,
+      enum: ['active', 'suspended'],
+      default: 'active',
+    },
     privacySettings: {
       showOnlineStatus: { type: Boolean, default: true },
       showLastSeen: { type: Boolean, default: true },

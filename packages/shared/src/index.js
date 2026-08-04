@@ -8,6 +8,8 @@ export const API_ROUTES = {
   CONVERSATIONS: '/api/v1/conversations',
   MESSAGES: '/api/v1/messages',
   NOTIFICATIONS: '/api/v1/notifications',
+  REPORTS: '/api/v1/reports',
+  ADMIN: '/api/v1/admin',
 };
 
 export const HTTP_STATUS = {

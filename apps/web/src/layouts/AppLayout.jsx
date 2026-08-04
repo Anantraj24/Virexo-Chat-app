@@ -119,7 +119,7 @@ export function AppLayout() {
   const userMenuItems = [
     { label: 'Settings', icon: <Settings className="w-3.5 h-3.5" />, onClick: () => navigate('/settings') },
     ...(user?.role === 'admin'
-      ? [{ label: 'Admin Dashboard', icon: <ShieldAlert className="w-3.5 h-3.5" />, onClick: () => {} }]
+      ? [{ label: 'Admin Dashboard', icon: <ShieldAlert className="w-3.5 h-3.5" />, onClick: () => navigate('/admin') }]
       : []),
     { divider: true },
     { label: 'Sign Out All Devices', icon: <LogOut className="w-3.5 h-3.5" />, danger: true, onClick: handleLogoutAll },

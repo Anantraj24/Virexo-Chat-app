@@ -4,12 +4,15 @@ import { MessageList } from './chat/MessageList';
 import { MessageComposer } from './chat/MessageComposer';
 import { TypingIndicator } from './chat/TypingIndicator';
 import { ForwardMessageModal } from './chat/ForwardMessageModal';
+import { ReportModal } from './modals/ReportModal';
 import { useParams, useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
 
 export function ChatLayout() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const jumpTo = searchParams.get('jumpTo');
+  const [reportTarget, setReportTarget] = useState(null); // { type: 'user'|'message'|'conversation', id: string, name: string }
   
   const chat = useChat(id, jumpTo);
 
@@ -37,6 +40,8 @@ export function ChatLayout() {
         conversation={chat.conversation}
         recipient={chat.getRecipient()}
         formatLastSeen={chat.formatLastSeen}
+        onReportUser={() => setReportTarget({ type: 'user', id: chat.getRecipient()?._id, name: chat.getRecipient()?.username })}
+        onReportConversation={() => setReportTarget({ type: 'conversation', id: chat.conversation?._id, name: chat.conversation?.name })}
       />
 
       <MessageList
@@ -60,6 +65,7 @@ export function ChatLayout() {
         onUnpin={chat.handleUnpinMessage}
         onReaction={chat.handleAddReaction}
         onForward={(msg) => chat.setForwardingMessage(msg)}
+        onReport={(msg) => setReportTarget({ type: 'message', id: msg._id, name: 'this message' })}
       />
 
       <TypingIndicator typingUsers={chat.typingUsers} />
@@ -85,6 +91,14 @@ export function ChatLayout() {
         isOpen={!!chat.forwardingMessage}
         onClose={() => chat.setForwardingMessage(null)}
         message={chat.forwardingMessage}
+      />
+
+      <ReportModal
+        isOpen={!!reportTarget}
+        onClose={() => setReportTarget(null)}
+        targetType={reportTarget?.type}
+        targetId={reportTarget?.id}
+        targetName={reportTarget?.name}
       />
     </div>
   );

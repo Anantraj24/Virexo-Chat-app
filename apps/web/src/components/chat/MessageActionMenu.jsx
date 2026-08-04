@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Edit2, Trash2, Reply, Forward, Pin, PinOff, Smile, XCircle, MoreVertical } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-export function MessageActionMenu({ message, currentUser, onEdit, onDelete, onDeleteForEveryone, onReply, onPin, onUnpin, onReaction, onForward }) {
+export function MessageActionMenu({ message, currentUser, onEdit, onDelete, onDeleteForEveryone, onReply, onPin, onUnpin, onReaction, onForward, onReport }) {
   const [isOpen, setIsOpen] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const menuRef = useRef(null);
@@ -121,6 +121,19 @@ export function MessageActionMenu({ message, currentUser, onEdit, onDelete, onDe
                   <span>Unpin</span>
                 </button>
               )}
+            </>
+          )}
+
+          {onReport && !isSender && (
+            <>
+              <div className="h-px bg-zinc-800 my-1" />
+              <button
+                onClick={() => { onReport(); setIsOpen(false); }}
+                className="w-full text-left px-3.5 py-2 text-xs font-medium flex items-center space-x-2.5 text-red-400 hover:bg-red-950/30 hover:text-red-300 transition cursor-pointer"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                <span>Report</span>
+              </button>
             </>
           )}
 

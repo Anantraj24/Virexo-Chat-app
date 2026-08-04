@@ -16,6 +16,8 @@ import messageRoutes from './routes/messageRoutes.js';
 import mediaRoutes from './routes/mediaRoutes.js';
 import searchRoutes from './routes/searchRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import reportRoutes from './routes/reportRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 // Validate environment on boot
 validateEnv();
@@ -92,6 +94,8 @@ app.use('/api/v1/messages', messageRoutes);
 app.use('/api/v1/media', mediaRoutes);
 app.use('/api/v1/search', searchRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/reports', reportRoutes);
+app.use('/api/v1/admin', adminRoutes);
 
 // Root Info Endpoint
 app.get('/', (req, res) => {

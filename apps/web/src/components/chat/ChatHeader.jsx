@@ -3,7 +3,7 @@ import { Avatar } from '../ui/Avatar';
 import { Button } from '../ui/Button';
 import { Dropdown } from '../ui/Dropdown';
 
-export function ChatHeader({ conversation, recipient, formatLastSeen }) {
+export function ChatHeader({ conversation, recipient, formatLastSeen, onReportUser, onReportConversation }) {
   const isDirect = conversation?.type === 'direct';
   const isGroup = conversation?.type === 'group' || conversation?.type === 'channel';
 
@@ -63,7 +63,9 @@ export function ChatHeader({ conversation, recipient, formatLastSeen }) {
             { label: 'View Profile', icon: null },
             { label: 'Mute Notifications', icon: null },
             { label: 'Conversation Settings', icon: null },
-          ]}
+            isDirect && onReportUser ? { label: 'Report User', icon: null, onClick: onReportUser, danger: true } : null,
+            !isDirect && onReportConversation ? { label: 'Report Group', icon: null, onClick: onReportConversation, danger: true } : null,
+          ].filter(Boolean)}
         />
       </div>
     </div>

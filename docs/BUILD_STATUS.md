@@ -1,8 +1,7 @@
 # Virexo Build Status & Progress Tracker
 
-## 1. Executive Status Summary
-- **Current Phase**: **Phase 16 - Notifications**
-- **Overall Status**: Secure media messaging, search functionality, and notification system implemented. All backend integration tests and frontend tests passing.
+- **Current Phase**: **Phase 17 - Moderation and Administration**
+- **Overall Status**: Moderation and admin systems implemented. All backend integration tests and frontend tests passing.
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -27,6 +26,7 @@
 | **Phase 14** | **Secure Media Messaging** | Cloudinary service adapter, Multer memory storage, signed/controlled upload API, validation, attachment message schema, image preview, video/audio players, PDF/file cards, browser MediaRecorder voice notes, tests | **COMPLETE** |
 | **Phase 15** | **Search without Paid Atlas** | Indexed user search, conversation search, MongoDB text-index message search, cursor pagination, debounced frontend search, keyboard navigation, result highlighting, safe query limits, tests | **COMPLETE** |
 | **Phase 16** | **Notifications** | Notification model, real-time in-app notifications, unread count, pagination, group invitations, replies/reactions/mentions triggers, Web Notifications API, duplicate-prevention, sound preference | **COMPLETE** |
+| **Phase 17** | **Moderation & Admin** | Report model, reporting UI, admin roles/authorization, admin dashboard, user suspension, audit logs | **COMPLETE** |
 
 ---
 
@@ -141,3 +141,12 @@
 - [x] Web Notifications API for active browser sessions and duplicate-notification prevention.
 - [x] Sound preference with accessible defaults (Web Audio API).
 - [x] Tests covering backend API and state.
+
+### Phase 17: Moderation and Administration
+- [x] Report user, message, and conversation.
+- [x] Report model and duplicate-report controls.
+- [x] Admin role and authorization middleware.
+- [x] Admin user listing, report status review, and audit log.
+- [x] Suspend/restore user and socket disconnection on suspension.
+- [x] Protected admin interface and confirmation dialogs.
+- [x] Tests proving non-admin denial and admin capabilities.
