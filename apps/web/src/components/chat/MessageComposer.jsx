@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { Send, XCircle, RotateCcw, ArrowLeft, Edit2 } from 'lucide-react';
+import { Send, XCircle, RotateCcw, ArrowLeft, Edit2, Paperclip, FileText, Image as ImageIcon, Film, Mic, Square, Trash2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 export function MessageComposer({
@@ -16,8 +16,27 @@ export function MessageComposer({
   editingMessage,
   onCancelEdit,
   onSubmitEdit,
+  pendingAttachments = [],
+  uploadAttachment,
+  removePendingAttachment,
 }) {
   const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const recordingTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (editingMessage) {
@@ -29,6 +48,76 @@ export function MessageComposer({
   const handleRetry = useCallback((idempotencyKey) => {
     onRetryFailed(idempotencyKey);
   }, [onRetryFailed]);
+
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    files.forEach((file) => {
+      uploadAttachment(file);
+    });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        // Don't auto-upload if canceled
+        if (audioChunksRef.current.length > 0) {
+          const file = new File([audioBlob], `voice-note-${Date.now()}.webm`, { type: 'audio/webm' });
+          uploadAttachment(file);
+        }
+        
+        // Stop all tracks
+        stream.getTracks().forEach((track) => track.stop());
+        setIsRecording(false);
+        setRecordingDuration(0);
+        if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error('Microphone access denied or error:', err);
+      // Could show toast here if we pass addToast down
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      audioChunksRef.current = []; // Clear chunks so onstop won't upload
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const formatDuration = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -105,27 +194,132 @@ export function MessageComposer({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="flex items-center space-x-2">
-        <input
-          ref={inputRef}
-          type="text"
-          value={inputText}
-          onChange={onInputChange}
-          disabled={sending || disabled}
-          placeholder={placeholder}
-          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
-        />
+      {pendingAttachments.length > 0 && (
+        <div className="flex flex-wrap gap-2 px-2 py-2 border-b border-zinc-800/40 mb-2">
+          {pendingAttachments.map((att) => (
+            <div key={att.clientId} className="relative group w-16 h-16 bg-zinc-800 rounded-lg overflow-hidden border border-zinc-700 flex items-center justify-center">
+              {att.file.type.startsWith('image/') ? (
+                <ImageIcon className="w-6 h-6 text-zinc-500" /> // Could generate a local preview URL here for better UX
+              ) : att.file.type.startsWith('video/') ? (
+                <Film className="w-6 h-6 text-zinc-500" />
+              ) : (
+                <FileText className="w-6 h-6 text-zinc-500" />
+              )}
+              
+              {att.uploading && (
+                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center">
+                  <div className="text-[10px] text-white font-medium">{att.progress}%</div>
+                  <div className="w-3/4 h-1 bg-zinc-700 rounded-full mt-1 overflow-hidden">
+                    <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${att.progress}%` }} />
+                  </div>
+                </div>
+              )}
 
-        <Button
-          type="submit"
-          variant="primary"
-          size="md"
-          isDisabled={!inputText.trim() || sending || disabled}
-          isLoading={sending}
-          leftIcon={<Send className="w-4 h-4" />}
+              {att.error && (
+                <div className="absolute inset-0 bg-red-500/20 flex flex-col items-center justify-center text-[10px] text-red-200 text-center leading-tight p-1">
+                  Error
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => removePendingAttachment(att.clientId)}
+                className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 text-zinc-300 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="flex items-center space-x-2">
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={sending || disabled || editingMessage}
+          className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-full transition disabled:opacity-50"
+          title="Attach file"
         >
-          {editingMessage ? 'Save' : 'Send'}
-        </Button>
+          <Paperclip className="w-5 h-5" />
+        </button>
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          multiple
+          className="hidden"
+          accept="image/*,video/*,application/pdf,.doc,.docx"
+        />
+        
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          multiple
+          className="hidden"
+          accept="image/*,video/*,application/pdf,.doc,.docx"
+        />
+        
+        {!isRecording ? (
+          <>
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputText}
+              onChange={onInputChange}
+              disabled={sending || disabled}
+              placeholder={placeholder}
+              className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+            />
+            {!inputText.trim() && !editingMessage && (
+              <button
+                type="button"
+                onClick={startRecording}
+                disabled={sending || disabled}
+                className="p-2 text-zinc-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-full transition disabled:opacity-50"
+                title="Record voice note"
+              >
+                <Mic className="w-5 h-5" />
+              </button>
+            )}
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              isDisabled={(!inputText.trim() && pendingAttachments.length === 0) || sending || disabled}
+              isLoading={sending}
+              leftIcon={<Send className="w-4 h-4" />}
+            >
+              {editingMessage ? 'Save' : 'Send'}
+            </Button>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-between bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-2">
+            <div className="flex items-center space-x-3 text-red-400">
+              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-xs font-medium font-mono">{formatDuration(recordingDuration)}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={cancelRecording}
+                className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-500/20 rounded-full transition"
+                title="Cancel"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={stopRecording}
+                className="p-1.5 bg-red-500 text-white hover:bg-red-600 rounded-full transition"
+                title="Stop & Send"
+              >
+                <Square className="w-4 h-4" fill="currentColor" />
+              </button>
+            </div>
+          </div>
+        )}
       </form>
     </div>
   );

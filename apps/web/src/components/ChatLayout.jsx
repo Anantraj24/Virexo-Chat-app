@@ -73,6 +73,9 @@ export function ChatLayout() {
         editingMessage={chat.editingMessage}
         onCancelEdit={chat.handleCancelEdit}
         onSubmitEdit={chat.submitEditMessage}
+        pendingAttachments={chat.pendingAttachments}
+        uploadAttachment={chat.uploadAttachment}
+        removePendingAttachment={chat.removePendingAttachment}
       />
 
       <ForwardMessageModal

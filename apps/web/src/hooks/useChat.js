@@ -16,6 +16,7 @@ import {
   addReactionRequest,
   removeReactionRequest,
 } from '../api/messageApi';
+import { uploadMediaRequest } from '../api/mediaApi';
 import { getConversationRequest } from '../api/conversationApi';
 
 const PAGE_SIZE = 50;
@@ -44,6 +45,8 @@ export function useChat(conversationId) {
   const [replyingTo, setReplyingTo] = useState(null);
   const [editingMessage, setEditingMessage] = useState(null);
   const [forwardingMessage, setForwardingMessage] = useState(null);
+
+  const [pendingAttachments, setPendingAttachments] = useState([]);
 
   const messagesEndRef = useRef(null);
   const containerRef = useRef(null);
@@ -270,14 +273,63 @@ export function useChat(conversationId) {
     }
   }, [pagination.nextCursor, loadingMore, checkIfNearBottom, scrollToBottom, addToast]);
 
+  const removePendingAttachment = useCallback((clientId) => {
+    setPendingAttachments((prev) => prev.filter((a) => a.clientId !== clientId));
+  }, []);
+
+  const uploadAttachment = useCallback(async (file) => {
+    const clientId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newPending = {
+      clientId,
+      file,
+      progress: 0,
+      uploading: true,
+      error: null,
+      attachment: null,
+    };
+
+    setPendingAttachments((prev) => [...prev, newPending]);
+
+    try {
+      const data = await uploadMediaRequest(file, (progressEvent) => {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        setPendingAttachments((prev) =>
+          prev.map((a) => (a.clientId === clientId ? { ...a, progress: percentCompleted } : a))
+        );
+      });
+
+      setPendingAttachments((prev) =>
+        prev.map((a) =>
+          a.clientId === clientId
+            ? { ...a, uploading: false, progress: 100, attachment: data.data.attachment }
+            : a
+        )
+      );
+    } catch (err) {
+      setPendingAttachments((prev) =>
+        prev.map((a) =>
+          a.clientId === clientId
+            ? { ...a, uploading: false, error: err.response?.data?.error?.message || 'Upload failed' }
+            : a
+        )
+      );
+      addToast({ message: 'Attachment upload failed', type: 'error' });
+    }
+  }, [addToast]);
+
   const handleSendMessage = useCallback(async (e) => {
-    e.preventDefault();
-    if (!inputText.trim() || sending) return;
+    e?.preventDefault();
+    
+    const content = inputText.trim();
+    const readyAttachments = pendingAttachments
+      .filter((a) => !a.uploading && a.attachment && !a.error)
+      .map((a) => a.attachment);
+
+    if (!content && readyAttachments.length === 0) return;
+    if (sending) return;
 
     const cid = conversationIdRef.current;
     if (!cid) return;
-
-    const content = inputText.trim();
     const idempotencyKey =
       typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString();
     const tempId = `temp-${Date.now()}`;
@@ -304,6 +356,7 @@ export function useChat(conversationId) {
       reactions: [],
       isEdited: false,
       isPinned: false,
+      attachments: readyAttachments,
     };
 
     setOptimisticMessages((prev) => [...prev, optimisticMsg]);
@@ -316,7 +369,10 @@ export function useChat(conversationId) {
         content,
         idempotencyKey,
         replyTo: replyingTo?._id || null,
+        attachments: readyAttachments,
       });
+
+      setPendingAttachments([]);
 
       const newMsg = res.data.message;
       setMessages((prev) => prev.map((m) => (m._id === tempId ? newMsg : m)));
@@ -689,6 +745,11 @@ export function useChat(conversationId) {
     submitEditMessage,
     forwardingMessage,
     setForwardingMessage,
+    onCancelForward: () => setForwardingMessage(null),
+    onSubmitForward: handleForwardMessage,
+    pendingAttachments,
+    uploadAttachment,
+    removePendingAttachment,
     getMessageReactions,
   };
 }

@@ -7,6 +7,7 @@ import { Avatar } from '../ui/Avatar';
 import { MessageStatus } from './MessageStatus';
 import { DateSeparator } from './DateSeparator';
 import { MessageActionMenu } from './MessageActionMenu';
+import { FileText, Image as ImageIcon, Film, Download } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 const MESSAGE_GROUP_GAP_MS = 120000;
@@ -42,6 +43,57 @@ function formatReplyPreview(message, allMessages) {
   const sender = replyMessage.senderId || { username: 'Unknown', displayName: 'Unknown' };
   const content = replyMessage.isDeleted ? '[This message was deleted]' : (replyMessage.content || '[Attachment]');
   return { senderName: sender.displayName || sender.username, content: content.substring(0, 60) };
+}
+
+function MessageAttachment({ attachment }) {
+  if (!attachment) return null;
+
+  if (attachment.type === 'image') {
+    return (
+      <div className="mt-2 max-w-sm rounded-lg overflow-hidden border border-zinc-800">
+        <a href={attachment.url} target="_blank" rel="noopener noreferrer">
+          <img src={attachment.url} alt="attachment" className="w-full h-auto max-h-64 object-cover" loading="lazy" />
+        </a>
+      </div>
+    );
+  }
+
+  if (attachment.type === 'video') {
+    return (
+      <div className="mt-2 max-w-sm rounded-lg overflow-hidden border border-zinc-800 bg-black">
+        <video src={attachment.url} controls className="w-full h-auto max-h-64" preload="metadata" />
+      </div>
+    );
+  }
+
+  if (attachment.type === 'audio') {
+    return (
+      <div className="mt-2 max-w-sm rounded-full overflow-hidden border border-zinc-800 bg-zinc-900 px-3 py-2">
+        <audio src={attachment.url} controls className="h-8 w-full max-w-[240px]" preload="metadata" />
+      </div>
+    );
+  }
+
+  // Document fallback
+  return (
+    <div className="mt-2 flex items-center space-x-3 bg-zinc-800/50 p-3 rounded-xl border border-zinc-700/50 max-w-sm">
+      <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center shrink-0">
+        <FileText className="w-5 h-5 text-indigo-400" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm text-zinc-200 truncate">{attachment.filename || 'Document'}</div>
+        <div className="text-xs text-zinc-500">File</div>
+      </div>
+      <a
+        href={attachment.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-8 h-8 rounded-full bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center text-zinc-300 transition shrink-0"
+      >
+        <Download className="w-4 h-4" />
+      </a>
+    </div>
+  );
 }
 
 const MessageItem = ({ message, isSelf, formatTime, currentUser, allMessages, onEdit, onDelete, onDeleteForEveryone, onReply, onPin, onUnpin, onReaction, onForward }) => {
@@ -87,14 +139,23 @@ const MessageItem = ({ message, isSelf, formatTime, currentUser, allMessages, on
         )}
 
         <div className={cn('flex items-center space-x-2 mt-0.5', isSelf && 'flex-row-reverse')}>
-          <span
-            className={cn(
-              'text-xs leading-relaxed',
-              message.isDeleted ? 'italic text-zinc-500' : 'text-zinc-300'
+          <div className="flex flex-col">
+            {message.content && (
+              <span
+                className={cn(
+                  'text-xs leading-relaxed',
+                  message.isDeleted ? 'italic text-zinc-500' : 'text-zinc-300'
+                )}
+              >
+                {message.content}
+              </span>
             )}
-          >
-            {message.content || '[Attachment]'}
-          </span>
+            
+            {!message.isDeleted && message.attachments?.map((att, idx) => (
+              <MessageAttachment key={idx} attachment={att} />
+            ))}
+          </div>
+
           {message.isEdited && (
             <span className="text-[10px] text-zinc-600" title="Edited">(edited)</span>
           )}

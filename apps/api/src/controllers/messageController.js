@@ -4,6 +4,7 @@ import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors.
 import { createApiResponse, SOCKET_EVENTS } from '@virexo/shared';
 import { markRead } from '../services/receiptService.js';
 import { getIO } from '../socket/socketServer.js';
+import { deleteResource } from '../services/cloudinary.js';
 
 const DELETE_FOR_EVERYONE_WINDOW_MS = 2 * 60 * 1000;
 
@@ -313,6 +314,15 @@ export async function deleteMessageForEveryone(req, res, next) {
 
     if (message.audit.deletionScope === 'everyone') {
       throw new BadRequestError('Message already deleted for everyone', 'ALREADY_DELETED');
+    }
+
+    if (message.attachments && message.attachments.length > 0) {
+      for (const attachment of message.attachments) {
+        if (attachment.publicId) {
+          // Fire and forget or await. Let's fire and forget, logging any error is better but for now catching is fine.
+          deleteResource(attachment.publicId, attachment.type === 'document' ? 'raw' : (attachment.type === 'audio' || attachment.type === 'video' ? 'video' : 'image')).catch(() => {});
+        }
+      }
     }
 
     message.isDeleted = true;

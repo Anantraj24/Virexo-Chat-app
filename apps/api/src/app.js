@@ -13,6 +13,7 @@ import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import conversationRoutes from './routes/conversationRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
+import mediaRoutes from './routes/mediaRoutes.js';
 
 // Validate environment on boot
 validateEnv();
@@ -86,6 +87,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/conversations', conversationRoutes);
 app.use('/api/v1/messages', messageRoutes);
+app.use('/api/v1/media', mediaRoutes);
 
 // Root Info Endpoint
 app.get('/', (req, res) => {
@@ -99,6 +101,7 @@ app.get('/', (req, res) => {
       users: '/api/v1/users',
       conversations: '/api/v1/conversations',
       messages: '/api/v1/messages',
+      media: '/api/v1/media',
     })
   );
 });

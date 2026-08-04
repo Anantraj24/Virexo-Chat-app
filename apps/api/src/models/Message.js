@@ -6,11 +6,12 @@ const attachmentSchema = new mongoose.Schema(
     publicId: { type: String, default: '' },
     type: {
       type: String,
-      enum: ['image', 'document'],
+      enum: ['image', 'document', 'video', 'audio'],
       required: true,
     },
     filename: { type: String, required: true },
     size: { type: Number, required: true },
+    duration: { type: Number },
   },
   { _id: false }
 );
