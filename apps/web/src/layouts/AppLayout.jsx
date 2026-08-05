@@ -12,6 +12,7 @@ import { NewDMModal } from '../components/NewDMModal';
 import { CreateGroupModal } from '../components/CreateGroupModal';
 import { GroupSettingsModal } from '../components/GroupSettingsModal';
 import SearchModal from '../components/SearchModal';
+import { apiClient as api } from '../api/axiosClient';
 import { ConversationList } from '../components/chat/ConversationList';
 import { NotificationBell } from '../components/notifications/NotificationBell';
 import { useGlobalSocket } from '../hooks/useGlobalSocket';
@@ -190,7 +191,7 @@ export function AppLayout() {
 
           <ConversationList
             conversations={conversations}
-            currentUserId={user?._id}
+            currentUserId={user?.id}
             loading={loadingConversations}
             searchQuery=""
           />
@@ -310,9 +311,9 @@ export function AppLayout() {
           } else {
             // Need to start DM or navigate to existing
             try {
-              const res = await api.post('/conversations/direct', { partnerId: targetId });
+              const res = await api.post('/conversations/direct', { recipientId: targetId });
               await fetchConversations();
-              navigate(`/dms/${res.data.conversation._id}`);
+              navigate(`/dms/${res.data.conversation.id}`);
             } catch (err) {
               addToast({ message: err.response?.data?.message || 'Failed to start conversation', type: 'error' });
             }

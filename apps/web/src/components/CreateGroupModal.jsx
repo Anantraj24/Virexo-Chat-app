@@ -56,8 +56,8 @@ export function CreateGroupModal({ isOpen, onClose, onGroupCreated }) {
   }, [memberSearch]);
 
   const toggleSelectMember = (user) => {
-    if (selectedMembers.some((m) => m._id === user._id)) {
-      setSelectedMembers(selectedMembers.filter((m) => m._id !== user._id));
+    if (selectedMembers.some((m) => m.id === user.id)) {
+      setSelectedMembers(selectedMembers.filter((m) => m.id !== user.id));
     } else {
       setSelectedMembers([...selectedMembers, user]);
     }
@@ -69,14 +69,14 @@ export function CreateGroupModal({ isOpen, onClose, onGroupCreated }) {
 
     setSubmitting(true);
     try {
-      const memberIds = selectedMembers.map((m) => m._id);
+      const memberIds = selectedMembers.map((m) => m.id);
       const res = await createGroupRequest({ name, description, memberIds });
       const group = res.data.conversation;
 
       addToast({ message: `Group channel "${group.name}" created!`, type: 'success' });
       if (onGroupCreated) onGroupCreated(group);
       onClose();
-      navigate(`/channels/${group._id}`);
+      navigate(`/channels/${group.id}`);
     } catch (err) {
       addToast({ message: err.message || 'Failed to create group channel', type: 'error' });
     } finally {
@@ -140,7 +140,7 @@ export function CreateGroupModal({ isOpen, onClose, onGroupCreated }) {
             <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-zinc-950/60 border border-zinc-800">
               {selectedMembers.map((user) => (
                 <span
-                  key={user._id}
+                  key={user.id}
                   className="inline-flex items-center space-x-1.5 px-2 py-1 rounded-lg bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 text-xs"
                 >
                   <span>{user.username}</span>
@@ -172,10 +172,10 @@ export function CreateGroupModal({ isOpen, onClose, onGroupCreated }) {
                 </div>
               ) : searchResults.length > 0 ? (
                 searchResults.map((user) => {
-                  const isSelected = selectedMembers.some((m) => m._id === user._id);
+                  const isSelected = selectedMembers.some((m) => m.id === user.id);
                   return (
                     <div
-                      key={user._id}
+                      key={user.id}
                       onClick={() => toggleSelectMember(user)}
                       className={`p-2 rounded-lg flex items-center justify-between text-xs cursor-pointer transition ${
                         isSelected

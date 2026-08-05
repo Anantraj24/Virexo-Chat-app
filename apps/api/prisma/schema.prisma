@@ -1,0 +1,234 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                       String    @id @default(cuid())
+  username                 String    @unique
+  displayName              String    @default("")
+  email                    String    @unique
+  passwordHash             String
+  avatarUrl                String    @default("")
+  avatarPublicId           String    @default("")
+  bio                      String    @default("")
+  status                   String    @default("offline")
+  lastSeen                 DateTime  @default(now())
+  role                     String    @default("user")
+  accountStatus            String    @default("active")
+  privacySettings          Json      @default("{\"showOnlineStatus\": true, \"showLastSeen\": true, \"readReceipts\": \"everyone\", \"allowDirectMessages\": \"everyone\"}")
+  notificationSettings     Json      @default("{\"emailNotifications\": true, \"desktopNotifications\": true, \"soundEnabled\": true, \"notifyOnMention\": true}")
+  isEmailVerified          Boolean   @default(false)
+  emailVerificationToken   String?
+  emailVerificationExpires DateTime?
+  lastVerificationSentAt   DateTime?
+  passwordResetToken       String?
+  passwordResetExpires     DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  refreshTokenHashes      RefreshToken[]
+  conversationMemberships ConversationMember[]
+  messages                Message[]            @relation("SentMessages")
+  reactions               Reaction[]
+  readReceipts            ReadReceipt[]
+  pinnedMessages          Message[]            @relation("PinnedBy")
+  createdAudits           MessageAudit[]       @relation("CreatedBy")
+  editedAudits            MessageAudit[]       @relation("EditedBy")
+  deletedAudits           MessageAudit[]       @relation("DeletedBy")
+  receivedNotifications   Notification[]       @relation("Recipient")
+  sentNotifications       Notification[]       @relation("Actor")
+  createdReports          Report[]             @relation("Reporter")
+  receivedReports         Report[]             @relation("ReportedUser")
+  adminLogs               AdminAuditLog[]
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hash      String
+  familyId  String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([hash])
+}
+
+model Conversation {
+  id            String   @id @default(cuid())
+  type          String
+  name          String   @default("")
+  description   String   @default("")
+  isPrivate     Boolean  @default(true)
+  avatarUrl     String   @default("")
+  directKey     String?  @unique
+  lastMessageId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  members  ConversationMember[]
+  messages Message[]
+  reports  Report[]
+
+  @@index([type, isPrivate])
+}
+
+model ConversationMember {
+  id              String   @id @default(cuid())
+  userId          String
+  conversationId  String
+  role            String   @default("member")
+  joinedAt        DateTime @default(now())
+  lastReadAt      DateTime @default(now())
+  lastDeliveredAt DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, conversationId])
+  @@index([userId, conversationId])
+}
+
+model Message {
+  id              String    @id @default(cuid())
+  conversationId  String
+  senderId        String
+  content         String    @default("")
+  idempotencyKey  String?   @unique
+  replyToId       String?
+  forwardedFromId String?
+  isEdited        Boolean   @default(false)
+  isDeleted       Boolean   @default(false)
+  isPinned        Boolean   @default(false)
+  pinnedAt        DateTime?
+  pinnedById      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("SentMessages", fields: [senderId], references: [id])
+  pinnedBy     User?        @relation("PinnedBy", fields: [pinnedById], references: [id])
+
+  replyTo       Message?  @relation("ReplyTo", fields: [replyToId], references: [id])
+  replies       Message[] @relation("ReplyTo")
+  forwardedFrom Message?  @relation("ForwardedFrom", fields: [forwardedFromId], references: [id])
+  forwards      Message[] @relation("ForwardedFrom")
+
+  attachments Attachment[]
+  reactions   Reaction[]
+  readBy      ReadReceipt[]
+  audit       MessageAudit?
+  reports     Report[]
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@index([senderId, createdAt(sort: Desc)])
+  @@index([isPinned, createdAt(sort: Desc)])
+}
+
+model Attachment {
+  id        String @id @default(cuid())
+  messageId String
+  url       String
+  publicId  String @default("")
+  type      String
+  filename  String
+  size      Int
+  duration  Int?
+  width     Int?
+  height    Int?
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+
+model Reaction {
+  id        String @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+}
+
+model ReadReceipt {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+}
+
+model MessageAudit {
+  id            String    @id @default(cuid())
+  messageId     String    @unique
+  createdById   String?
+  editedAt      DateTime?
+  editedById    String?
+  deletedAt     DateTime?
+  deletedById   String?
+  deletionScope String    @default("self")
+
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("CreatedBy", fields: [createdById], references: [id])
+  editedBy  User?   @relation("EditedBy", fields: [editedById], references: [id])
+  deletedBy User?   @relation("DeletedBy", fields: [deletedById], references: [id])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  recipientId String
+  actorId     String
+  type        String
+  entityId    String
+  entityModel String
+  content     String   @default("")
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  recipient User @relation("Recipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actor     User @relation("Actor", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, createdAt(sort: Desc)])
+}
+
+model Report {
+  id                     String   @id @default(cuid())
+  reporterId             String
+  reportedUserId         String?
+  reportedMessageId      String?
+  reportedConversationId String?
+  reason                 String
+  description            String   @default("")
+  status                 String   @default("pending")
+  moderatorNotes         String   @default("")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  reporter             User          @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedUser         User?         @relation("ReportedUser", fields: [reportedUserId], references: [id])
+  reportedMessage      Message?      @relation(fields: [reportedMessageId], references: [id])
+  reportedConversation Conversation? @relation(fields: [reportedConversationId], references: [id])
+}
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String
+  targetType String
+  targetId   String?
+  details    Json     @default("{}")
+  createdAt  DateTime @default(now())
+
+  admin User @relation(fields: [adminId], references: [id], onDelete: Cascade)
+}

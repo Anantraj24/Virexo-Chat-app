@@ -51,7 +51,7 @@ export const useSocketStore = create((set, get) => ({
       const currentReceipt = state.receipts[conversationId] || { members: [] };
       const updatedMembers = [...currentReceipt.members];
 
-      const idx = updatedMembers.findIndex((m) => (m.userId._id || m.userId).toString() === userId.toString());
+      const idx = updatedMembers.findIndex((m) => (m.userId.id || m.userId).toString() === userId.toString());
       if (idx >= 0) {
         updatedMembers[idx] = {
           ...updatedMembers[idx],

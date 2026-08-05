@@ -1,4 +1,4 @@
-import { User } from '../models/User.js';
+import prisma from '../config/prisma.js';
 
 class PresenceManager {
   constructor() {
@@ -55,7 +55,7 @@ class PresenceManager {
   }
 
   /**
-   * Persists online/offline status to MongoDB with 30-second write throttling.
+   * Persists online/offline status to DB with 30-second write throttling.
    */
   async updateUserStatusThrottled(userId, status) {
     const uId = userId.toString();
@@ -66,9 +66,12 @@ class PresenceManager {
     if (status === 'offline' || now - lastWrite > 30000) {
       this.lastDbWrite.set(uId, now);
       try {
-        await User.findByIdAndUpdate(uId, {
-          status,
-          lastSeen: new Date(),
+        await prisma.user.update({
+          where: { id: uId },
+          data: {
+            status,
+            lastSeen: new Date(),
+          }
         });
       } catch {
         // Silently ignore background presence DB write failures

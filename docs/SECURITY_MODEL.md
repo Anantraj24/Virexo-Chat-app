@@ -34,7 +34,7 @@ Express API uses `helmet` to configure defensive HTTP security headers:
 
 ### 2.3 Input Validation & Sanitization
 - All external inputs are validated and sanitized at API boundaries using `express-validator`.
-- MongoDB injection prevention via Mongoose strict query casting.
+- SQL injection prevention via Prisma parameterized queries and type-safe schema modeling.
 - Generic authentication errors (e.g. "Invalid email or password") to prevent user enumeration attacks.
 
 ---

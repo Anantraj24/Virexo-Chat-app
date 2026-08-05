@@ -56,13 +56,13 @@ export function NewDMModal({ isOpen, onClose, onConversationCreated }) {
     setStarting(true);
 
     try {
-      const res = await createDirectRequest({ recipientId: selectedUser._id });
+      const res = await createDirectRequest({ recipientId: selectedUser.id });
       const conversation = res.data.conversation;
 
       addToast({ message: `Direct message started with ${selectedUser.username}`, type: 'success' });
       if (onConversationCreated) onConversationCreated(conversation);
       onClose();
-      navigate(`/dms/${conversation._id}`);
+      navigate(`/dms/${conversation.id}`);
     } catch (err) {
       addToast({ message: err.message || 'Failed to start direct message', type: 'error' });
     } finally {
@@ -112,10 +112,10 @@ export function NewDMModal({ isOpen, onClose, onConversationCreated }) {
           ) : results.length > 0 ? (
             results.map((user) => (
               <div
-                key={user._id}
+                key={user.id}
                 onClick={() => setSelectedUser(user)}
                 className={`p-2.5 rounded-xl border flex items-center space-x-3 cursor-pointer transition ${
-                  selectedUser?._id === user._id
+                  selectedUser?.id === user.id
                     ? 'bg-indigo-600/20 border-indigo-500 text-white'
                     : 'bg-zinc-950/60 border-zinc-800 text-zinc-300 hover:bg-zinc-900 hover:text-white'
                 }`}

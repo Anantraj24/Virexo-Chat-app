@@ -1,5 +1,5 @@
 import { verifyAccessToken } from '../utils/token.js';
-import { User } from '../models/User.js';
+import prisma from '../config/prisma.js';
 
 export async function socketAuthMiddleware(socket, next) {
   try {
@@ -23,7 +23,10 @@ export async function socketAuthMiddleware(socket, next) {
     }
 
     // Fetch user profile
-    const user = await User.findById(payload.userId);
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId }
+    });
+    
     if (!user) {
       return next(new Error('Authentication failed: User no longer exists'));
     }

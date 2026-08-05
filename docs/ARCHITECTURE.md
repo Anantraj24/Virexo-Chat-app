@@ -41,7 +41,7 @@ flowchart TB
     end
 
     subgraph External ["External Services (Free Tier)"]
-        Mongo[("MongoDB Atlas M0\n(Persistence & Indexes)")]
+        PostgreSQL[("Neon PostgreSQL\n(Persistence & Indexes)")]
         Cloudinary[("Cloudinary\n(Media Attachment CDN)")]
         Brevo[("Brevo API\n(Transactional Email)")]
     end
@@ -55,11 +55,11 @@ flowchart TB
 
     Helmet --> Cors --> RateLimit --> Express
     Express --> AuthMiddleware
-    AuthMiddleware --> Mongo
+    AuthMiddleware --> PostgreSQL
     Express --> UploadHandler --> Cloudinary
     Express --> Brevo
     SocketServer -- "Verify Handshake Token" --> AuthMiddleware
-    SocketServer --> Mongo
+    SocketServer --> PostgreSQL
 ```
 
 ---
@@ -72,7 +72,7 @@ sequenceDiagram
     actor User as Client App (React)
     participant AuthAPI as Express Auth Router
     participant Cookie as Browser Cookie Jar
-    participant DB as MongoDB Atlas
+    participant DB as PostgreSQL (Neon)
     participant Socket as Socket.io Server
 
     Note over User, DB: Initial Authentication Flow
@@ -127,5 +127,5 @@ To maintain clean system boundaries and optimize server resources, Virexo strict
 ## 5. Free-Tier Architectural Adaptations
 
 1. **In-Memory Upload Streaming**: Render free instances lack persistent disk storage. Uploads process via `multer.memoryStorage()`, passing binary streams straight to Cloudinary.
-2. **Database Connection Pooling**: Mongoose limits pool size (`maxPoolSize: 10`) to prevent exhausting MongoDB Atlas M0's 500-connection ceiling.
+2. **Database Connection Pooling**: Prisma configures connection pooling to prevent exhausting Neon PostgreSQL's free-tier connection ceiling.
 3. **Graceful Socket Reconnections**: React Socket client utilizes exponential backoff reconnection strategies to handle automatic server restarts or cold spins on Render.

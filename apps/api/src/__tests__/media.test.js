@@ -1,33 +1,33 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import app from '../app.js';
-import { User } from '../models/User.js';
+import { setupTestDB, teardownTestDB, cleanCollections, prisma } from './testSetup.js';
 import { generateAccessToken } from '../utils/token.js';
 
-let mongoServer;
-let token;
-
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const uri = mongoServer.getUri();
-  await mongoose.connect(uri);
-
-  const user = new User({
-    username: 'media_user',
-    email: 'media@example.com',
-    passwordHash: 'hashed_password',
-  });
-  await user.save();
-  token = generateAccessToken(user);
+  await setupTestDB();
 }, 60000);
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  if (mongoServer) {
-    await mongoServer.stop();
-  }
+  await teardownTestDB();
+});
+
+let token;
+let user;
+
+beforeEach(async () => {
+  await cleanCollections();
+  
+  user = await prisma.user.create({
+    data: {
+      username: 'media_test_user',
+      email: 'media@example.com',
+      passwordHash: 'hashedpassword',
+      isEmailVerified: true
+    }
+  });
+
+  token = generateAccessToken(user);
 });
 
 describe('Media API Integration Tests', () => {

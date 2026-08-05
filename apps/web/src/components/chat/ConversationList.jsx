@@ -14,7 +14,7 @@ export function ConversationList({ conversations, currentUserId, loading, search
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     if (c.type === 'direct') {
-      const otherMember = c.members?.find((m) => (m.userId._id || m.userId).toString() !== currentUserId);
+      const otherMember = c.members?.find((m) => (m.userId.id || m.userId).toString() !== currentUserId);
       const name = otherMember?.userId?.displayName || otherMember?.userId?.username || '';
       return name.toLowerCase().includes(query);
     }
@@ -25,7 +25,7 @@ export function ConversationList({ conversations, currentUserId, loading, search
   const filteredDMs = filteredConversations.filter((c) => c.type === 'direct');
 
   const getDMRecipient = (conv) => {
-    const otherMember = conv.members?.find((m) => (m.userId._id || m.userId).toString() !== currentUserId);
+    const otherMember = conv.members?.find((m) => (m.userId.id || m.userId).toString() !== currentUserId);
     return otherMember?.userId || { username: 'Unknown User', displayName: 'Unknown User' };
   };
 
@@ -50,11 +50,11 @@ export function ConversationList({ conversations, currentUserId, loading, search
           <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Channels</div>
           <nav className="space-y-0.5">
             {filteredChannels.map((channel) => {
-              const unread = unreadCounts[channel._id] || 0;
+              const unread = unreadCounts[channel.id] || 0;
               return (
                 <NavLink
-                  key={channel._id}
-                  to={`/channels/${channel._id}`}
+                  key={channel.id}
+                  to={`/channels/${channel.id}`}
                   className={({ isActive }) =>
                     cn(
                       'flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition',
@@ -84,11 +84,11 @@ export function ConversationList({ conversations, currentUserId, loading, search
           <nav className="space-y-0.5">
             {filteredDMs.map((dm) => {
               const recipient = getDMRecipient(dm);
-              const unread = unreadCounts[dm._id] || 0;
+              const unread = unreadCounts[dm.id] || 0;
               return (
                 <NavLink
-                  key={dm._id}
-                  to={`/dms/${dm._id}`}
+                  key={dm.id}
+                  to={`/dms/${dm.id}`}
                   className={({ isActive }) =>
                     cn(
                       'flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition',

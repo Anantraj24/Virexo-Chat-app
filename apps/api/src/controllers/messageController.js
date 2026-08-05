@@ -1,6 +1,4 @@
-import { Message } from '../models/Message.js';
-import { Conversation } from '../models/Conversation.js';
-import { User } from '../models/User.js';
+import prisma from '../config/prisma.js';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors.js';
 import { createApiResponse, SOCKET_EVENTS } from '@virexo/shared';
 import { markRead } from '../services/receiptService.js';
@@ -10,20 +8,40 @@ import { triggerNotification } from './notificationController.js';
 
 const DELETE_FOR_EVERYONE_WINDOW_MS = 2 * 60 * 1000;
 
-async function populateMessage(doc) {
-  return doc.populate({
-    path: 'senderId',
-    select: '_id username displayName avatarUrl status role',
-  });
-}
+const messageInclude = {
+  sender: {
+    select: {
+      id: true,
+      username: true,
+      displayName: true,
+      avatarUrl: true,
+      status: true,
+      role: true
+    }
+  },
+  attachments: true,
+  reactions: true,
+  readBy: true,
+  audit: true
+};
 
 async function verifyMessageAccess(messageId, currentUserId) {
-  const message = await Message.findById(messageId).populate('conversationId');
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: {
+      conversation: {
+        include: { members: true }
+      },
+      ...messageInclude
+    }
+  });
+
   if (!message) {
     throw new NotFoundError('Message not found', 'MESSAGE_NOT_FOUND');
   }
-  const conversation = message.conversationId;
-  const member = conversation.members.find((m) => m.userId.toString() === currentUserId);
+
+  const conversation = message.conversation;
+  const member = conversation.members.find((m) => m.userId === currentUserId);
   if (!member) {
     throw new ForbiddenError('You are not a member of this conversation', 'NOT_A_MEMBER');
   }
@@ -33,27 +51,29 @@ async function verifyMessageAccess(messageId, currentUserId) {
 export async function createMessage(req, res, next) {
   try {
     const { conversationId, content = '', attachments = [], idempotencyKey, replyTo, forwardedFrom } = req.body;
-    const currentUserId = req.user._id.toString();
+    const currentUserId = req.user.id || req.user.id;
 
-    const conversation = await Conversation.findById(conversationId);
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { members: true }
+    });
+
     if (!conversation) {
       throw new NotFoundError('Conversation not found', 'CONVERSATION_NOT_FOUND');
     }
 
-    const member = conversation.members.find((m) => m.userId.toString() === currentUserId);
+    const member = conversation.members.find((m) => m.userId === currentUserId);
     if (!member) {
       throw new ForbiddenError('You are not a member of this conversation', 'NOT_A_MEMBER');
     }
 
     if (idempotencyKey) {
-      const existingMessage = await Message.findOne({
-        conversationId,
-        senderId: currentUserId,
-        idempotencyKey,
+      const existingMessage = await prisma.message.findUnique({
+        where: { idempotencyKey },
+        include: messageInclude
       });
 
-      if (existingMessage) {
-        await populateMessage(existingMessage);
+      if (existingMessage && existingMessage.senderId === currentUserId) {
         return res.status(200).json(
           createApiResponse(true, { message: existingMessage, isExisting: true })
         );
@@ -61,27 +81,55 @@ export async function createMessage(req, res, next) {
     }
 
     const now = new Date();
-    const message = new Message({
-      conversationId,
-      senderId: currentUserId,
-      content,
-      attachments,
-      idempotencyKey,
-      replyTo,
-      forwardedFrom,
-      readBy: [{ userId: currentUserId, readAt: now }],
-      audit: { createdBy: currentUserId },
+    
+    // Create message and audit in transaction
+    const message = await prisma.message.create({
+      data: {
+        conversationId,
+        senderId: currentUserId,
+        content,
+        idempotencyKey: idempotencyKey || null,
+        replyToId: replyTo || null,
+        forwardedFromId: forwardedFrom || null,
+        attachments: {
+          create: attachments.map(a => ({
+            url: a.url,
+            publicId: a.publicId || "",
+            type: a.type,
+            filename: a.filename,
+            size: a.size,
+            duration: a.duration || null,
+            width: a.width || null,
+            height: a.height || null
+          }))
+        },
+        readBy: {
+          create: { userId: currentUserId, readAt: now }
+        },
+        audit: {
+          create: { createdById: currentUserId }
+        }
+      },
+      include: messageInclude
     });
 
-    await message.save();
-
-    conversation.lastMessageId = message._id;
-    conversation.updatedAt = now;
-    member.lastReadAt = now;
-    member.lastDeliveredAt = now;
-    await conversation.save();
-
-    await populateMessage(message);
+    // Update conversation and member in transaction
+    await prisma.$transaction([
+      prisma.conversation.update({
+        where: { id: conversationId },
+        data: {
+          lastMessageId: message.id,
+          updatedAt: now
+        }
+      }),
+      prisma.conversationMember.update({
+        where: { userId_conversationId: { userId: currentUserId, conversationId } },
+        data: {
+          lastReadAt: now,
+          lastDeliveredAt: now
+        }
+      })
+    ]);
 
     try {
       const io = getIO();
@@ -94,13 +142,13 @@ export async function createMessage(req, res, next) {
     }
 
     if (replyTo) {
-      const originalMessage = await Message.findById(replyTo);
-      if (originalMessage && originalMessage.senderId.toString() !== currentUserId) {
+      const originalMessage = await prisma.message.findUnique({ where: { id: replyTo } });
+      if (originalMessage && originalMessage.senderId !== currentUserId) {
         triggerNotification({
           recipientId: originalMessage.senderId,
           actorId: currentUserId,
           type: 'message_reply',
-          entityId: message._id,
+          entityId: message.id,
           entityModel: 'Message',
           content: `replied to your message in "${conversation.type === 'group' ? conversation.name : 'a direct message'}"`,
         }).catch(console.error);
@@ -112,18 +160,17 @@ export async function createMessage(req, res, next) {
     const matches = [...content.matchAll(mentionRegex)];
     if (matches.length > 0) {
       const usernames = matches.map((m) => m[1]);
-      const mentionedUsers = await User.find({ username: { $in: usernames } });
+      const mentionedUsers = await prisma.user.findMany({ where: { username: { in: usernames } } });
       
       for (const mentionedUser of mentionedUsers) {
-        if (mentionedUser._id.toString() !== currentUserId) {
-          // Check if they are in the conversation
-          const isMember = conversation.members.some(m => m.userId.toString() === mentionedUser._id.toString());
+        if (mentionedUser.id !== currentUserId) {
+          const isMember = conversation.members.some(m => m.userId === mentionedUser.id);
           if (isMember) {
             triggerNotification({
-              recipientId: mentionedUser._id,
+              recipientId: mentionedUser.id,
               actorId: currentUserId,
               type: 'mention',
-              entityId: message._id,
+              entityId: message.id,
               entityModel: 'Message',
               content: `mentioned you in "${conversation.type === 'group' ? conversation.name : 'a direct message'}"`,
             }).catch(console.error);
@@ -141,45 +188,46 @@ export async function createMessage(req, res, next) {
 export async function getMessageHistory(req, res, next) {
   try {
     const { conversationId } = req.params;
-    const currentUserId = req.user._id.toString();
+    const currentUserId = req.user.id || req.user.id;
     const limit = parseInt(req.query.limit, 10) || 50;
     const cursor = req.query.cursor ? new Date(req.query.cursor) : null;
 
-    const conversation = await Conversation.findById(conversationId);
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { members: true }
+    });
+
     if (!conversation) {
       throw new NotFoundError('Conversation not found', 'CONVERSATION_NOT_FOUND');
     }
 
-    const member = conversation.members.find((m) => m.userId.toString() === currentUserId);
+    const member = conversation.members.find((m) => m.userId === currentUserId);
     if (!member) {
       throw new ForbiddenError('You are not a member of this conversation', 'NOT_A_MEMBER');
     }
 
-    const query = { conversationId };
+    const where = { conversationId };
     if (cursor) {
-      query.createdAt = { $lt: cursor };
+      where.createdAt = { lt: cursor };
     }
 
-    const rawMessages = await Message.find(query)
-      .sort({ createdAt: -1 })
-      .limit(limit + 1)
-      .populate({
-        path: 'senderId',
-        select: '_id username displayName avatarUrl status role',
-      })
-      .lean();
+    const rawMessages = await prisma.message.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      include: messageInclude
+    });
 
     const hasNextPage = rawMessages.length > limit;
     const itemsDesc = hasNextPage ? rawMessages.slice(0, limit) : rawMessages;
     const nextCursor = hasNextPage ? itemsDesc[itemsDesc.length - 1].createdAt.toISOString() : null;
 
-    const otherMembers = conversation.members.filter((m) => m.userId.toString() !== currentUserId);
+    const otherMembers = conversation.members.filter((m) => m.userId !== currentUserId);
 
-    const items = itemsDesc.reverse().map((msgDoc) => {
-      const msgObj = typeof msgDoc.toObject === 'function' ? msgDoc.toObject() : { ...msgDoc };
+    const items = itemsDesc.reverse().map((msgObj) => {
       const msgDate = new Date(msgObj.createdAt);
 
-      if (msgObj.senderId._id.toString() === currentUserId) {
+      if (msgObj.senderId === currentUserId) {
         const isReadByOthers = otherMembers.some((m) => m.lastReadAt && new Date(m.lastReadAt) >= msgDate);
         const isDeliveredToOthers = otherMembers.some((m) => m.lastDeliveredAt && new Date(m.lastDeliveredAt) >= msgDate);
 
@@ -191,11 +239,13 @@ export async function getMessageHistory(req, res, next) {
       return msgObj;
     });
 
-    const unreadCount = await Message.countDocuments({
-      conversationId,
-      senderId: { $ne: currentUserId },
-      createdAt: { $gt: member.lastReadAt || new Date(0) },
-      isDeleted: false,
+    const unreadCount = await prisma.message.count({
+      where: {
+        conversationId,
+        senderId: { not: currentUserId },
+        createdAt: { gt: member.lastReadAt || new Date(0) },
+        isDeleted: false,
+      }
     });
 
     res.status(200).json(
@@ -218,54 +268,53 @@ export async function getMessageHistory(req, res, next) {
 export async function getMessagesAround(req, res, next) {
   try {
     const { conversationId, messageId } = req.params;
-    const currentUserId = req.user._id.toString();
+    const currentUserId = req.user.id || req.user.id;
 
-    const conversation = await Conversation.findById(conversationId);
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { members: true }
+    });
+
     if (!conversation) {
       throw new NotFoundError('Conversation not found', 'CONVERSATION_NOT_FOUND');
     }
 
-    const member = conversation.members.find((m) => m.userId.toString() === currentUserId);
+    const member = conversation.members.find((m) => m.userId === currentUserId);
     if (!member) {
       throw new ForbiddenError('You are not a member of this conversation', 'NOT_A_MEMBER');
     }
 
-    const targetMessage = await Message.findById(messageId);
-    if (!targetMessage || targetMessage.conversationId.toString() !== conversationId) {
+    const targetMessage = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: messageInclude
+    });
+
+    if (!targetMessage || targetMessage.conversationId !== conversationId) {
       throw new NotFoundError('Message not found in this conversation', 'MESSAGE_NOT_FOUND');
     }
 
     // Fetch up to 20 messages older than target
-    const olderMessages = await Message.find({
-      conversationId,
-      createdAt: { $lt: targetMessage.createdAt },
-      isDeleted: false
-    })
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .populate({
-        path: 'senderId',
-        select: '_id username displayName avatarUrl status role',
-      })
-      .lean();
+    const olderMessages = await prisma.message.findMany({
+      where: {
+        conversationId,
+        createdAt: { lt: targetMessage.createdAt },
+        isDeleted: false
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      include: messageInclude
+    });
 
     // Fetch up to 20 messages newer than target
-    const newerMessages = await Message.find({
-      conversationId,
-      createdAt: { $gt: targetMessage.createdAt },
-      isDeleted: false
-    })
-      .sort({ createdAt: 1 })
-      .limit(20)
-      .populate({
-        path: 'senderId',
-        select: '_id username displayName avatarUrl status role',
-      })
-      .lean();
-
-    await targetMessage.populate({
-      path: 'senderId',
-      select: '_id username displayName avatarUrl status role',
+    const newerMessages = await prisma.message.findMany({
+      where: {
+        conversationId,
+        createdAt: { gt: targetMessage.createdAt },
+        isDeleted: false
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 20,
+      include: messageInclude
     });
 
     // Combine them (older need to be reversed to chronological)
@@ -275,13 +324,12 @@ export async function getMessagesAround(req, res, next) {
       ...olderMessages,
     ];
 
-    const otherMembers = conversation.members.filter((m) => m.userId.toString() !== currentUserId);
+    const otherMembers = conversation.members.filter((m) => m.userId !== currentUserId);
 
-    const items = combinedDesc.reverse().map((msgDoc) => {
-      const msgObj = typeof msgDoc.toObject === 'function' ? msgDoc.toObject() : { ...msgDoc };
+    const items = combinedDesc.reverse().map((msgObj) => {
       const msgDate = new Date(msgObj.createdAt);
 
-      if (msgObj.senderId._id.toString() === currentUserId) {
+      if (msgObj.senderId === currentUserId) {
         const isReadByOthers = otherMembers.some((m) => m.lastReadAt && new Date(m.lastReadAt) >= msgDate);
         const isDeliveredToOthers = otherMembers.some((m) => m.lastDeliveredAt && new Date(m.lastDeliveredAt) >= msgDate);
 
@@ -295,7 +343,7 @@ export async function getMessagesAround(req, res, next) {
 
     const nextCursor = olderMessages.length === 20 ? olderMessages[olderMessages.length - 1].createdAt.toISOString() : null;
 
-    res.status(200).json(createApiResponse(true, { messages: items, nextCursor, targetId: targetMessage._id }));
+    res.status(200).json(createApiResponse(true, { messages: items, nextCursor, targetId: targetMessage.id }));
   } catch (error) {
     next(error);
   }
@@ -304,7 +352,7 @@ export async function getMessagesAround(req, res, next) {
 export async function markConversationRead(req, res, next) {
   try {
     const { conversationId } = req.params;
-    const currentUserId = req.user._id.toString();
+    const currentUserId = req.user.id || req.user.id;
 
     const result = await markRead(conversationId, currentUserId);
     if (!result) {
@@ -326,7 +374,7 @@ export async function markConversationRead(req, res, next) {
 export async function editMessage(req, res, next) {
   try {
     const { id } = req.params;
-    const currentUserId = req.user._id.toString();
+    const currentUserId = req.user.id || req.user.id;
     const { content } = req.body;
 
     if (!content || !content.trim()) {
@@ -339,7 +387,7 @@ export async function editMessage(req, res, next) {
 
     const { message, conversation } = await verifyMessageAccess(id, currentUserId);
 
-    if (message.senderId.toString() !== currentUserId) {
+    if (message.senderId !== currentUserId) {
       throw new ForbiddenError('Only the message sender can edit this message', 'PERMISSION_DENIED');
     }
 
@@ -348,29 +396,38 @@ export async function editMessage(req, res, next) {
     }
 
     const previousContent = message.content;
-    message.content = content.trim();
-    message.isEdited = true;
-    message.audit.editedAt = new Date();
-    message.audit.editedBy = currentUserId;
+    const now = new Date();
 
-    await message.save();
-    await populateMessage(message);
+    const updatedMessage = await prisma.message.update({
+      where: { id },
+      data: {
+        content: content.trim(),
+        isEdited: true,
+        audit: {
+          update: {
+            editedAt: now,
+            editedById: currentUserId
+          }
+        }
+      },
+      include: messageInclude
+    });
 
     try {
       const io = getIO();
-      io.to(`conversation:${conversation._id}`).emit(SOCKET_EVENTS.MESSAGE_EDITED, {
-        messageId: message._id,
-        conversationId: conversation._id,
-        content: message.content,
-        isEdited: message.isEdited,
-        editedAt: message.audit.editedAt,
+      io.to(`conversation:${conversation.id}`).emit(SOCKET_EVENTS.MESSAGE_EDITED, {
+        messageId: updatedMessage.id,
+        conversationId: conversation.id,
+        content: updatedMessage.content,
+        isEdited: updatedMessage.isEdited,
+        editedAt: updatedMessage.audit.editedAt,
       });
     } catch {
       // Ignore if socket IO server is not booted in test mode
     }
 
     res.status(200).json(
-      createApiResponse(true, { message, previousContent })
+      createApiResponse(true, { message: updatedMessage, previousContent })
     );
   } catch (error) {
     next(error);
@@ -380,32 +437,41 @@ export async function editMessage(req, res, next) {
 export async function deleteMessage(req, res, next) {
   try {
     const { id } = req.params;
-    const currentUserId = req.user._id.toString();
+    const currentUserId = req.user.id || req.user.id;
 
     const { message, conversation } = await verifyMessageAccess(id, currentUserId);
 
-    const isSender = message.senderId.toString() === currentUserId;
-    const isOwner = conversation.members.find((m) => m.userId.toString() === currentUserId)?.role === 'owner';
+    const isSender = message.senderId === currentUserId;
+    const isOwner = conversation.members.find((m) => m.userId === currentUserId)?.role === 'owner';
 
     if (!isSender && !isOwner) {
       throw new ForbiddenError('Only the message sender or group owner can delete this message', 'PERMISSION_DENIED');
     }
 
-    message.isDeleted = true;
-    message.content = '[This message was deleted]';
-    message.attachments = [];
-    message.audit.deletedAt = new Date();
-    message.audit.deletedBy = currentUserId;
-    message.audit.deletionScope = 'self';
+    // Delete attachments from DB
+    await prisma.attachment.deleteMany({ where: { messageId: id } });
 
-    await message.save();
-    await populateMessage(message);
+    const updatedMessage = await prisma.message.update({
+      where: { id },
+      data: {
+        isDeleted: true,
+        content: '[This message was deleted]',
+        audit: {
+          update: {
+            deletedAt: new Date(),
+            deletedById: currentUserId,
+            deletionScope: 'self'
+          }
+        }
+      },
+      include: messageInclude
+    });
 
     try {
       const io = getIO();
-      io.to(`conversation:${message.conversationId}`).emit(SOCKET_EVENTS.MESSAGE_DELETED, {
-        messageId: message._id,
-        conversationId: message.conversationId,
+      io.to(`conversation:${updatedMessage.conversationId}`).emit(SOCKET_EVENTS.MESSAGE_DELETED, {
+        messageId: updatedMessage.id,
+        conversationId: updatedMessage.conversationId,
         deletionScope: 'self',
         deletedBy: currentUserId,
       });
@@ -414,7 +480,7 @@ export async function deleteMessage(req, res, next) {
     }
 
     res.status(200).json(
-      createApiResponse(true, { message, info: 'Message deleted successfully' })
+      createApiResponse(true, { message: updatedMessage, info: 'Message deleted successfully' })
     );
   } catch (error) {
     next(error);
@@ -424,11 +490,11 @@ export async function deleteMessage(req, res, next) {
 export async function deleteMessageForEveryone(req, res, next) {
   try {
     const { id } = req.params;
-    const currentUserId = req.user._id.toString();
+    const currentUserId = req.user.id || req.user.id;
 
     const { message, conversation, member } = await verifyMessageAccess(id, currentUserId);
 
-    const isSender = message.senderId.toString() === currentUserId;
+    const isSender = message.senderId === currentUserId;
     const isOwner = member.role === 'owner';
     const isAdmin = member.role === 'admin';
 
@@ -441,34 +507,41 @@ export async function deleteMessageForEveryone(req, res, next) {
       throw new ForbiddenError('Messages can only be deleted for everyone within 2 minutes of sending', 'DELETE_WINDOW_EXPIRED');
     }
 
-    if (message.audit.deletionScope === 'everyone') {
+    if (message.audit?.deletionScope === 'everyone') {
       throw new BadRequestError('Message already deleted for everyone', 'ALREADY_DELETED');
     }
 
     if (message.attachments && message.attachments.length > 0) {
       for (const attachment of message.attachments) {
         if (attachment.publicId) {
-          // Fire and forget or await. Let's fire and forget, logging any error is better but for now catching is fine.
           deleteResource(attachment.publicId, attachment.type === 'document' ? 'raw' : (attachment.type === 'audio' || attachment.type === 'video' ? 'video' : 'image')).catch(() => {});
         }
       }
     }
 
-    message.isDeleted = true;
-    message.content = '[This message was deleted]';
-    message.attachments = [];
-    message.audit.deletedAt = new Date();
-    message.audit.deletedBy = currentUserId;
-    message.audit.deletionScope = 'everyone';
+    await prisma.attachment.deleteMany({ where: { messageId: id } });
 
-    await message.save();
-    await populateMessage(message);
+    const updatedMessage = await prisma.message.update({
+      where: { id },
+      data: {
+        isDeleted: true,
+        content: '[This message was deleted]',
+        audit: {
+          update: {
+            deletedAt: new Date(),
+            deletedById: currentUserId,
+            deletionScope: 'everyone'
+          }
+        }
+      },
+      include: messageInclude
+    });
 
     try {
       const io = getIO();
-      io.to(`conversation:${message.conversationId}`).emit(SOCKET_EVENTS.MESSAGE_DELETED, {
-        messageId: message._id,
-        conversationId: message.conversationId,
+      io.to(`conversation:${updatedMessage.conversationId}`).emit(SOCKET_EVENTS.MESSAGE_DELETED, {
+        messageId: updatedMessage.id,
+        conversationId: updatedMessage.conversationId,
         deletionScope: 'everyone',
         deletedBy: currentUserId,
       });
@@ -477,7 +550,7 @@ export async function deleteMessageForEveryone(req, res, next) {
     }
 
     res.status(200).json(
-      createApiResponse(true, { message, info: 'Message deleted for everyone' })
+      createApiResponse(true, { message: updatedMessage, info: 'Message deleted for everyone' })
     );
   } catch (error) {
     next(error);
@@ -487,7 +560,7 @@ export async function deleteMessageForEveryone(req, res, next) {
 export async function pinMessage(req, res, next) {
   try {
     const { id } = req.params;
-    const currentUserId = req.user._id.toString();
+    const currentUserId = req.user.id || req.user.id;
 
     const { message, conversation, member } = await verifyMessageAccess(id, currentUserId);
 
@@ -505,25 +578,28 @@ export async function pinMessage(req, res, next) {
       throw new BadRequestError('Message is already pinned', 'ALREADY_PINNED');
     }
 
-    message.isPinned = true;
-    message.pinnedAt = new Date();
-    message.pinnedBy = currentUserId;
-
-    await message.save();
-    await populateMessage(message);
+    const updatedMessage = await prisma.message.update({
+      where: { id },
+      data: {
+        isPinned: true,
+        pinnedAt: new Date(),
+        pinnedById: currentUserId
+      },
+      include: messageInclude
+    });
 
     try {
       const io = getIO();
-      io.to(`conversation:${conversation._id}`).emit(SOCKET_EVENTS.MESSAGE_PINNED, {
-        messageId: message._id,
-        conversationId: conversation._id,
+      io.to(`conversation:${conversation.id}`).emit(SOCKET_EVENTS.MESSAGE_PINNED, {
+        messageId: updatedMessage.id,
+        conversationId: conversation.id,
         pinnedBy: currentUserId,
       });
     } catch {
       // Ignore if socket IO server is not booted in test mode
     }
 
-    res.status(200).json(createApiResponse(true, { message, info: 'Message pinned' }));
+    res.status(200).json(createApiResponse(true, { message: updatedMessage, info: 'Message pinned' }));
   } catch (error) {
     next(error);
   }
@@ -532,11 +608,11 @@ export async function pinMessage(req, res, next) {
 export async function unpinMessage(req, res, next) {
   try {
     const { id } = req.params;
-    const currentUserId = req.user._id.toString();
+    const currentUserId = req.user.id || req.user.id;
 
     const { message, conversation, member } = await verifyMessageAccess(id, currentUserId);
 
-    const isPinner = message.pinnedBy && message.pinnedBy.toString() === currentUserId;
+    const isPinner = message.pinnedById === currentUserId;
     const isOwner = member.role === 'owner';
     const isAdmin = member.role === 'admin';
 
@@ -548,25 +624,28 @@ export async function unpinMessage(req, res, next) {
       throw new BadRequestError('Message is not pinned', 'NOT_PINNED');
     }
 
-    message.isPinned = false;
-    message.pinnedAt = null;
-    message.pinnedBy = null;
-
-    await message.save();
-    await populateMessage(message);
+    const updatedMessage = await prisma.message.update({
+      where: { id },
+      data: {
+        isPinned: false,
+        pinnedAt: null,
+        pinnedById: null
+      },
+      include: messageInclude
+    });
 
     try {
       const io = getIO();
-      io.to(`conversation:${conversation._id}`).emit(SOCKET_EVENTS.MESSAGE_UNPINNED, {
-        messageId: message._id,
-        conversationId: conversation._id,
+      io.to(`conversation:${conversation.id}`).emit(SOCKET_EVENTS.MESSAGE_UNPINNED, {
+        messageId: updatedMessage.id,
+        conversationId: conversation.id,
         unpinnedBy: currentUserId,
       });
     } catch {
       // Ignore if socket IO server is not booted in test mode
     }
 
-    res.status(200).json(createApiResponse(true, { message, info: 'Message unpinned' }));
+    res.status(200).json(createApiResponse(true, { message: updatedMessage, info: 'Message unpinned' }));
   } catch (error) {
     next(error);
   }
@@ -575,7 +654,7 @@ export async function unpinMessage(req, res, next) {
 export async function addReaction(req, res, next) {
   try {
     const { id } = req.params;
-    const currentUserId = req.user._id.toString();
+    const currentUserId = req.user.id || req.user.id;
     const { emoji } = req.body;
 
     if (!emoji || typeof emoji !== 'string' || emoji.length > 2) {
@@ -588,28 +667,40 @@ export async function addReaction(req, res, next) {
       throw new ForbiddenError('Cannot react to a deleted message', 'MESSAGE_DELETED');
     }
 
-    const existingReaction = message.reactions.find(
-      (r) => r.emoji === emoji && r.userId.toString() === currentUserId
-    );
+    const existingReaction = await prisma.reaction.findUnique({
+      where: {
+        messageId_userId_emoji: {
+          messageId: id,
+          userId: currentUserId,
+          emoji
+        }
+      }
+    });
 
     if (existingReaction) {
-      message.reactions = message.reactions.filter(
-        (r) => !(r.emoji === emoji && r.userId.toString() === currentUserId)
-      );
+      await prisma.reaction.delete({ where: { id: existingReaction.id } });
     } else {
-      message.reactions.push({ emoji, userId: currentUserId });
+      await prisma.reaction.create({
+        data: {
+          messageId: id,
+          userId: currentUserId,
+          emoji
+        }
+      });
     }
 
-    await message.save();
-    await populateMessage(message);
+    const updatedMessage = await prisma.message.findUnique({
+      where: { id },
+      include: messageInclude
+    });
 
     try {
       const io = getIO();
-      io.to(`conversation:${conversation._id}`).emit(
+      io.to(`conversation:${conversation.id}`).emit(
         existingReaction ? SOCKET_EVENTS.MESSAGE_REACTION_REMOVED : SOCKET_EVENTS.MESSAGE_REACTION_ADDED,
         {
-          messageId: message._id,
-          conversationId: conversation._id,
+          messageId: updatedMessage.id,
+          conversationId: conversation.id,
           emoji,
           userId: currentUserId,
           action: existingReaction ? 'removed' : 'added',
@@ -619,18 +710,18 @@ export async function addReaction(req, res, next) {
       // Ignore if socket IO server is not booted in test mode
     }
 
-    if (!existingReaction && message.senderId._id.toString() !== currentUserId) {
+    if (!existingReaction && updatedMessage.senderId !== currentUserId) {
       triggerNotification({
-        recipientId: message.senderId._id,
+        recipientId: updatedMessage.senderId,
         actorId: currentUserId,
         type: 'message_reaction',
-        entityId: message._id,
+        entityId: updatedMessage.id,
         entityModel: 'Message',
         content: `reacted ${emoji} to your message`,
       }).catch(console.error);
     }
 
-    res.status(200).json(createApiResponse(true, { message, action: existingReaction ? 'removed' : 'added' }));
+    res.status(200).json(createApiResponse(true, { message: updatedMessage, action: existingReaction ? 'removed' : 'added' }));
   } catch (error) {
     next(error);
   }
@@ -639,7 +730,7 @@ export async function addReaction(req, res, next) {
 export async function removeReaction(req, res, next) {
   try {
     const { id } = req.params;
-    const currentUserId = req.user._id.toString();
+    const currentUserId = req.user.id || req.user.id;
     const { emoji } = req.body;
 
     if (!emoji || typeof emoji !== 'string') {
@@ -648,23 +739,32 @@ export async function removeReaction(req, res, next) {
 
     const { message, conversation } = await verifyMessageAccess(id, currentUserId);
 
-    const initialLength = message.reactions.length;
-    message.reactions = message.reactions.filter(
-      (r) => !(r.emoji === emoji && r.userId.toString() === currentUserId)
-    );
+    const existingReaction = await prisma.reaction.findUnique({
+      where: {
+        messageId_userId_emoji: {
+          messageId: id,
+          userId: currentUserId,
+          emoji
+        }
+      }
+    });
 
-    if (message.reactions.length === initialLength) {
+    if (!existingReaction) {
       throw new BadRequestError('No such reaction found', 'REACTION_NOT_FOUND');
     }
 
-    await message.save();
-    await populateMessage(message);
+    await prisma.reaction.delete({ where: { id: existingReaction.id } });
+
+    const updatedMessage = await prisma.message.findUnique({
+      where: { id },
+      include: messageInclude
+    });
 
     try {
       const io = getIO();
-      io.to(`conversation:${conversation._id}`).emit(SOCKET_EVENTS.MESSAGE_REACTION_REMOVED, {
-        messageId: message._id,
-        conversationId: conversation._id,
+      io.to(`conversation:${conversation.id}`).emit(SOCKET_EVENTS.MESSAGE_REACTION_REMOVED, {
+        messageId: updatedMessage.id,
+        conversationId: conversation.id,
         emoji,
         userId: currentUserId,
       });
@@ -672,7 +772,7 @@ export async function removeReaction(req, res, next) {
       // Ignore if socket IO server is not booted in test mode
     }
 
-    res.status(200).json(createApiResponse(true, { message, info: 'Reaction removed' }));
+    res.status(200).json(createApiResponse(true, { message: updatedMessage, info: 'Reaction removed' }));
   } catch (error) {
     next(error);
   }
@@ -682,14 +782,18 @@ export async function removeReaction(req, res, next) {
 export async function forwardMessage(req, res, next) {
   try {
     const { id } = req.params;
-    const currentUserId = req.user._id.toString();
+    const currentUserId = req.user.id || req.user.id;
     const { conversationId } = req.body;
 
     if (!conversationId) {
       throw new BadRequestError('Conversation ID is required', 'CONVERSATION_ID_REQUIRED');
     }
 
-    const sourceMessage = await Message.findById(id);
+    const sourceMessage = await prisma.message.findUnique({
+      where: { id },
+      include: { attachments: true }
+    });
+
     if (!sourceMessage) {
       throw new NotFoundError('Message not found', 'MESSAGE_NOT_FOUND');
     }
@@ -698,44 +802,67 @@ export async function forwardMessage(req, res, next) {
       throw new ForbiddenError('Cannot forward a deleted message', 'MESSAGE_DELETED');
     }
 
-    // Verify target conversation exists and user is a member
-    const targetConversation = await Conversation.findById(conversationId);
+    const targetConversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { members: true }
+    });
+
     if (!targetConversation) {
       throw new NotFoundError('Target conversation not found', 'CONVERSATION_NOT_FOUND');
     }
 
-    const targetMember = targetConversation.members.find((m) => m.userId.toString() === currentUserId);
+    const targetMember = targetConversation.members.find((m) => m.userId === currentUserId);
     if (!targetMember) {
       throw new ForbiddenError('You are not a member of the target conversation', 'NOT_A_MEMBER');
     }
 
-    // Create forwarded message
     const now = new Date();
-    const forwardedMessage = new Message({
-      conversationId,
-      senderId: currentUserId,
-      content: sourceMessage.content || '',
-      attachments: sourceMessage.attachments || [],
-      forwardedFrom: sourceMessage._id,
-      readBy: [{ userId: currentUserId, readAt: now }],
-      audit: { createdBy: currentUserId },
+
+    const forwardedMessage = await prisma.message.create({
+      data: {
+        conversationId,
+        senderId: currentUserId,
+        content: sourceMessage.content || '',
+        forwardedFromId: sourceMessage.id,
+        attachments: {
+          create: sourceMessage.attachments.map(a => ({
+            url: a.url,
+            publicId: a.publicId || "",
+            type: a.type,
+            filename: a.filename,
+            size: a.size,
+            duration: a.duration || null,
+            width: a.width || null,
+            height: a.height || null
+          }))
+        },
+        readBy: {
+          create: { userId: currentUserId, readAt: now }
+        },
+        audit: {
+          create: { createdById: currentUserId }
+        }
+      },
+      include: messageInclude
     });
 
-    await forwardedMessage.save();
+    await prisma.$transaction([
+      prisma.conversation.update({
+        where: { id: conversationId },
+        data: {
+          lastMessageId: forwardedMessage.id,
+          updatedAt: now
+        }
+      }),
+      prisma.conversationMember.update({
+        where: { userId_conversationId: { userId: currentUserId, conversationId } },
+        data: {
+          lastReadAt: now,
+          lastDeliveredAt: now
+        }
+      })
+    ]);
 
-    // Update target conversation
-    targetConversation.lastMessageId = forwardedMessage._id;
-    targetConversation.updatedAt = now;
-    targetMember.lastReadAt = now;
-    targetMember.lastDeliveredAt = now;
-    await targetConversation.save();
-
-    await forwardedMessage.populate({
-      path: 'senderId',
-      select: '_id username displayName avatarUrl status role',
-    });
-
-    // Broadcast real-time message:new event to target conversation room
     try {
       const io = getIO();
       io.to(`conversation:${conversationId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, {

@@ -10,7 +10,7 @@ export const useNotificationStore = create((set, get) => ({
   
   addNotification: (notification) => set((state) => {
     // Prevent duplicate adds if already present (e.g. from race conditions)
-    if (state.notifications.some(n => n._id === notification._id)) return state;
+    if (state.notifications.some(n => n.id === notification.id)) return state;
     return {
       notifications: [notification, ...state.notifications],
       unreadCount: notification.isRead ? state.unreadCount : state.unreadCount + 1
@@ -24,14 +24,14 @@ export const useNotificationStore = create((set, get) => ({
   setPagination: ({ hasNextPage, nextCursor }) => set({ hasNextPage, nextCursor }),
 
   appendNotifications: (newNotifications) => set((state) => {
-    const existingIds = new Set(state.notifications.map(n => n._id));
-    const filtered = newNotifications.filter(n => !existingIds.has(n._id));
+    const existingIds = new Set(state.notifications.map(n => n.id));
+    const filtered = newNotifications.filter(n => !existingIds.has(n.id));
     return { notifications: [...state.notifications, ...filtered] };
   }),
 
   markAsReadLocally: (id) => set((state) => ({
     notifications: state.notifications.map(n => 
-      n._id === id ? { ...n, isRead: true } : n
+      n.id === id ? { ...n, isRead: true } : n
     ),
     unreadCount: Math.max(0, state.unreadCount - 1)
   })),

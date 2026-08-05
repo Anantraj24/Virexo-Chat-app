@@ -6,8 +6,8 @@ export const createMessageRules = [
     .trim()
     .notEmpty()
     .withMessage('Conversation ID is required')
-    .isMongoId()
-    .withMessage('Conversation ID must be a valid MongoDB ObjectId'),
+    .isString()
+    .withMessage('Conversation ID must be a valid ID'),
   body('content')
     .optional()
     .trim()
@@ -20,12 +20,12 @@ export const createMessageRules = [
     .withMessage('Idempotency key is too long'),
   body('replyTo')
     .optional()
-    .isMongoId()
-    .withMessage('ReplyTo must be a valid MongoDB ObjectId'),
+    .isString()
+    .withMessage('ReplyTo must be a valid ID'),
   body('forwardedFrom')
     .optional()
-    .isMongoId()
-    .withMessage('ForwardedFrom must be a valid MongoDB ObjectId'),
+    .isString()
+    .withMessage('ForwardedFrom must be a valid ID'),
   body().custom((value, { req }) => {
     const hasContent = req.body.content && req.body.content.trim().length > 0;
     const hasAttachments = Array.isArray(req.body.attachments) && req.body.attachments.length > 0;
@@ -40,8 +40,8 @@ export const createMessageRules = [
 
 export const getMessageHistoryRules = [
   param('conversationId')
-    .isMongoId()
-    .withMessage('Invalid conversation ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })
@@ -55,32 +55,32 @@ export const getMessageHistoryRules = [
 
 export const getMessagesAroundRules = [
   param('conversationId')
-    .isMongoId()
-    .withMessage('Invalid conversation ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   param('messageId')
-    .isMongoId()
-    .withMessage('Invalid message ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   handleValidationErrors,
 ];
 
 export const deleteMessageRules = [
   param('id')
-    .isMongoId()
-    .withMessage('Invalid message ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   handleValidationErrors,
 ];
 
 export const markReadRules = [
   param('conversationId')
-    .isMongoId()
-    .withMessage('Invalid conversation ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   handleValidationErrors,
 ];
 
 export const editMessageRules = [
   param('id')
-    .isMongoId()
-    .withMessage('Invalid message ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   body('content')
     .trim()
     .notEmpty()
@@ -92,29 +92,29 @@ export const editMessageRules = [
 
 export const deleteForEveryoneRules = [
   param('id')
-    .isMongoId()
-    .withMessage('Invalid message ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   handleValidationErrors,
 ];
 
 export const pinMessageRules = [
   param('id')
-    .isMongoId()
-    .withMessage('Invalid message ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   handleValidationErrors,
 ];
 
 export const unpinMessageRules = [
   param('id')
-    .isMongoId()
-    .withMessage('Invalid message ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   handleValidationErrors,
 ];
 
 export const addReactionRules = [
   param('id')
-    .isMongoId()
-    .withMessage('Invalid message ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   body('emoji')
     .trim()
     .notEmpty()
@@ -126,8 +126,8 @@ export const addReactionRules = [
 
 export const removeReactionRules = [
   param('id')
-    .isMongoId()
-    .withMessage('Invalid message ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   body('emoji')
     .trim()
     .notEmpty()
@@ -137,13 +137,13 @@ export const removeReactionRules = [
 
 export const forwardMessageRules = [
   param('id')
-    .isMongoId()
-    .withMessage('Invalid message ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   body('conversationId')
     .trim()
     .notEmpty()
     .withMessage('Target conversation ID is required')
-    .isMongoId()
-    .withMessage('Target conversation ID must be a valid MongoDB ObjectId'),
+    .isString()
+    .withMessage('Target conversation ID must be a valid ID'),
   handleValidationErrors,
 ];

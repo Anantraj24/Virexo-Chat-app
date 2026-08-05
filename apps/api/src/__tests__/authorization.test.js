@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  setupMongoMemory,
-  teardownMongoMemory,
+  setupTestDB,
+  teardownTestDB,
   cleanCollections,
   createTestUser,
   createConversation,
@@ -10,11 +10,11 @@ import {
 } from './testSetup.js';
 
 beforeAll(async () => {
-  await setupMongoMemory();
+  await setupTestDB();
 }, 60000);
 
 afterAll(async () => {
-  await teardownMongoMemory();
+  await teardownTestDB();
 });
 
 beforeEach(async () => {
@@ -114,14 +114,14 @@ describe('Authorization Matrix Tests', () => {
       const { token: outsiderToken } = await createTestUser({ username: 'outsider' });
 
       const conversation = await createConversation([
-        { userId: owner._id, role: 'owner' },
-        { userId: member._id, role: 'member' },
+        { userId: owner.id, role: 'owner' },
+        { userId: member.id, role: 'member' },
       ], 'group');
 
       const res = await request(app)
         .post('/api/v1/messages')
         .set('Authorization', `Bearer ${outsiderToken}`)
-        .send({ conversationId: conversation._id.toString(), content: 'I should not be able to send this' });
+        .send({ conversationId: conversation.id.toString(), content: 'I should not be able to send this' });
 
       expect(res.status).toBe(403);
     });
@@ -133,12 +133,12 @@ describe('Authorization Matrix Tests', () => {
       const { user: member, token: memberToken } = await createTestUser({ username: 'grp_member' });
 
       const conversation = await createConversation([
-        { userId: owner._id, role: 'owner' },
-        { userId: member._id, role: 'member' },
+        { userId: owner.id, role: 'owner' },
+        { userId: member.id, role: 'member' },
       ], 'group');
 
       const res = await request(app)
-        .delete(`/api/v1/conversations/${conversation._id}`)
+        .delete(`/api/v1/conversations/${conversation.id}`)
         .set('Authorization', `Bearer ${memberToken}`);
 
       // Should be 403 or 404 (depending on implementation — either is acceptable for authorization denial)
@@ -151,15 +151,15 @@ describe('Authorization Matrix Tests', () => {
       const { user: target } = await createTestUser({ username: 'xfer_target' });
 
       const conversation = await createConversation([
-        { userId: owner._id, role: 'owner' },
-        { userId: member._id, role: 'member' },
-        { userId: target._id, role: 'member' },
+        { userId: owner.id, role: 'owner' },
+        { userId: member.id, role: 'member' },
+        { userId: target.id, role: 'member' },
       ], 'group');
 
       const res = await request(app)
-        .post(`/api/v1/conversations/${conversation._id}/transfer-ownership`)
+        .post(`/api/v1/conversations/${conversation.id}/transfer-ownership`)
         .set('Authorization', `Bearer ${memberToken}`)
-        .send({ newOwnerId: target._id.toString() });
+        .send({ newOwnerId: target.id.toString() });
 
       expect(res.status).toBe(403);
     });

@@ -12,12 +12,12 @@ export const searchMessagesRules = [
     .withMessage('Search query is too long'),
   query('conversationId')
     .optional()
-    .isMongoId()
-    .withMessage('conversationId must be a valid MongoDB ObjectId'),
+    .isString()
+    .withMessage('conversationId must be a valid ID'),
   query('senderId')
     .optional()
-    .isMongoId()
-    .withMessage('senderId must be a valid MongoDB ObjectId'),
+    .isString()
+    .withMessage('senderId must be a valid ID'),
   query('attachmentType')
     .optional()
     .isString()

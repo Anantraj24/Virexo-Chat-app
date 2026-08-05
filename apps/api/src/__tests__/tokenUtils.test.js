@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { setupMongoMemory, teardownMongoMemory } from './testSetup.js';
+import { setupTestDB, teardownTestDB } from './testSetup.js';
 import {
   hashPassword,
   comparePassword,
@@ -13,11 +13,11 @@ import {
 // MongoMemoryServer is needed because env.js imports and token.js
 // uses env vars that are resolved at module load time.
 beforeAll(async () => {
-  await setupMongoMemory();
+  await setupTestDB();
 }, 60000);
 
 afterAll(async () => {
-  await teardownMongoMemory();
+  await teardownTestDB();
 });
 
 describe('Token Utility Unit Tests', () => {
@@ -60,7 +60,7 @@ describe('Token Utility Unit Tests', () => {
 
   describe('generateAccessToken / verifyAccessToken', () => {
     const mockUser = {
-      _id: '507f1f77bcf86cd799439011',
+      id: '507f1f77bcf86cd799439011',
       username: 'testuser',
       email: 'test@example.com',
       role: 'user',
@@ -74,7 +74,7 @@ describe('Token Utility Unit Tests', () => {
 
       const decoded = verifyAccessToken(token);
       expect(decoded).not.toBeNull();
-      expect(decoded.userId).toBe(mockUser._id);
+      expect(decoded.userId).toBe(mockUser.id);
       expect(decoded.username).toBe(mockUser.username);
       expect(decoded.email).toBe(mockUser.email);
       expect(decoded.role).toBe(mockUser.role);
@@ -93,7 +93,7 @@ describe('Token Utility Unit Tests', () => {
 
   describe('generateRefreshToken / verifyRefreshToken', () => {
     const mockUser = {
-      _id: '507f1f77bcf86cd799439011',
+      id: '507f1f77bcf86cd799439011',
       username: 'testuser',
       email: 'test@example.com',
       role: 'user',
@@ -108,7 +108,7 @@ describe('Token Utility Unit Tests', () => {
 
       const decoded = verifyRefreshToken(token);
       expect(decoded).not.toBeNull();
-      expect(decoded.userId).toBe(mockUser._id);
+      expect(decoded.userId).toBe(mockUser.id);
       expect(decoded.familyId).toBe(familyId);
       expect(decoded.jti).toBeDefined();
     });

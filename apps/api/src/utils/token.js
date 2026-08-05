@@ -21,7 +21,7 @@ export function hashToken(token) {
 // JWT Token Generation
 export function generateAccessToken(user) {
   const payload = {
-    userId: user._id.toString(),
+    userId: user.id || user.id,
     username: user.username,
     email: user.email,
     role: user.role,
@@ -32,7 +32,7 @@ export function generateAccessToken(user) {
 export function generateRefreshToken(user, familyId, rememberMe = true) {
   const expiresIn = rememberMe ? '7d' : '1d';
   const payload = {
-    userId: user._id.toString(),
+    userId: user.id || user.id,
     familyId,
     jti: crypto.randomUUID(),
   };

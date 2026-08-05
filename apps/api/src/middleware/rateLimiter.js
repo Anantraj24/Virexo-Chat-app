@@ -4,7 +4,7 @@ import { createApiResponse } from '@virexo/shared';
 
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Max 10 auth requests per IP
+  max: env.isDevelopment ? 100 : 10, // Max 10 auth requests per IP in prod
   standardHeaders: true,
   legacyHeaders: false,
   skip: () => env.isTest, // Skip rate limiting during Vitest integration runs

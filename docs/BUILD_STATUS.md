@@ -1,7 +1,7 @@
 # Virexo Build Status & Progress Tracker
 
-- **Current Phase**: **Phase 19 - Performance and Accessibility**
-- **Overall Status**: Performance optimizations and accessibility enhancements are complete.
+- **Current Phase**: **Phase 20A - PostgreSQL Migration**
+- **Overall Status**: MongoDB has been fully replaced with PostgreSQL and Prisma ORM. Feature parity achieved.
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -29,6 +29,7 @@
 | **Phase 17** | **Moderation & Admin** | Report model, reporting UI, admin roles/authorization, admin dashboard, user suspension, audit logs | **COMPLETE** |
 | **Phase 18** | **Security & Reliability Audit** | Token rotation/reuse handling, CORS/cookies across Vercel/Render, NoSQL injection risks, XSS/unsafe rendering, rate limiting, duplicate message creation, and stale room membership | **COMPLETE** |
 | **Phase 19** | **Performance & Accessibility** | Route-level lazy loading, query cache policies, message list performance, image dimensions, Mongo query projections, keyboard navigation, semantic labels, contrast | **COMPLETE** |
+| **Phase 20A** | **PostgreSQL Migration** | Database engine migration from MongoDB to PostgreSQL using Prisma ORM. Replaces ObjectIds with cuid, rewrites all queries, and maps data to a relational schema. | **COMPLETE** |
 
 ---
 
@@ -171,3 +172,12 @@
 - [x] Image dimensions saved on upload (`mediaController.js`) to prevent Cumulative Layout Shift (CLS).
 - [x] Accessibility improved with ARIA live regions (`LiveAnnouncer`), semantic labels, and focus management.
 - [x] Production build and asset compression successfully validated (`npm run build`).
+
+### Phase 20A: PostgreSQL Migration
+- [x] Prisma installed and schema defined (`apps/api/prisma/schema.prisma`).
+- [x] Replaced Mongoose ODM with Prisma Client across all API controllers and services.
+- [x] Database transitioned from NoSQL MongoDB to relational PostgreSQL.
+- [x] Validation middleware updated to validate `cuid`/strings instead of `ObjectId`.
+- [x] Frontend variables `_id` refactored to `id` across all React components and stores.
+- [x] Idempotency, rate limiting, and core logic rebuilt and tested for the relational data model.
+- [x] Resolved startup database connection failures and `ECONNREFUSED` issues.

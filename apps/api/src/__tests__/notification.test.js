@@ -1,20 +1,19 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import {
-  setupMongoMemory,
-  teardownMongoMemory,
+import { prisma,
+  setupTestDB,
+  teardownTestDB,
   cleanCollections,
   createTestUser,
   app,
   request,
 } from './testSetup.js';
-import { Notification } from '../models/Notification.js';
 
 beforeAll(async () => {
-  await setupMongoMemory();
+  await setupTestDB();
 }, 60000);
 
 afterAll(async () => {
-  await teardownMongoMemory();
+  await teardownTestDB();
 });
 
 beforeEach(async () => {
@@ -25,14 +24,16 @@ describe('Notification API Integration Tests', () => {
   async function seedNotifications(recipientId, actorId, count = 3) {
     const notifications = [];
     for (let i = 0; i < count; i++) {
-      const n = await Notification.create({
-        recipient: recipientId,
-        actor: actorId,
-        type: 'message_reply',
-        entityId: recipientId, // dummy entity
-        entityModel: 'Message',
-        content: `Notification ${i + 1}`,
-        isRead: i === 0, // first one is read, rest are unread
+      const n = await prisma.notification.create({
+        data: {
+          recipientId: recipientId,
+          actorId: actorId,
+          type: 'message_reply',
+          entityId: recipientId, // dummy entity
+          entityModel: 'Message',
+          content: `Notification ${i + 1}`,
+          isRead: i === 0, // first one is read, rest are unread
+        },
       });
       notifications.push(n);
     }
@@ -43,7 +44,7 @@ describe('Notification API Integration Tests', () => {
     const { user: recipient, token } = await createTestUser({ username: 'notif_user' });
     const { user: actor } = await createTestUser({ username: 'actor_user' });
 
-    await seedNotifications(recipient._id, actor._id, 3);
+    await seedNotifications(recipient.id, actor.id, 3);
 
     const res = await request(app)
       .get('/api/v1/notifications')
@@ -61,7 +62,7 @@ describe('Notification API Integration Tests', () => {
     const { user: recipient, token } = await createTestUser({ username: 'count_user' });
     const { user: actor } = await createTestUser({ username: 'count_actor' });
 
-    await seedNotifications(recipient._id, actor._id, 5);
+    await seedNotifications(recipient.id, actor.id, 5);
 
     const res = await request(app)
       .get('/api/v1/notifications/unread-count')
@@ -75,11 +76,11 @@ describe('Notification API Integration Tests', () => {
     const { user: recipient, token } = await createTestUser({ username: 'mark_user' });
     const { user: actor } = await createTestUser({ username: 'mark_actor' });
 
-    const notifications = await seedNotifications(recipient._id, actor._id, 2);
+    const notifications = await seedNotifications(recipient.id, actor.id, 2);
     const unreadNotif = notifications[1]; // second is unread
 
     const res = await request(app)
-      .post(`/api/v1/notifications/${unreadNotif._id}/read`)
+      .post(`/api/v1/notifications/${unreadNotif.id}/read`)
       .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
@@ -90,7 +91,7 @@ describe('Notification API Integration Tests', () => {
     const { user: recipient, token } = await createTestUser({ username: 'all_user' });
     const { user: actor } = await createTestUser({ username: 'all_actor' });
 
-    await seedNotifications(recipient._id, actor._id, 4);
+    await seedNotifications(recipient.id, actor.id, 4);
 
     const res = await request(app)
       .post('/api/v1/notifications/mark-all-read')
@@ -99,10 +100,10 @@ describe('Notification API Integration Tests', () => {
     expect(res.status).toBe(200);
 
     // Verify all are now read
-    const unreadCount = await Notification.countDocuments({
-      recipient: recipient._id,
+    const unreadCount = await prisma.notification.count({ where: {
+      recipientId: recipient.id,
       isRead: false,
-    });
+    } });
     expect(unreadCount).toBe(0);
   });
 
@@ -116,7 +117,7 @@ describe('Notification API Integration Tests', () => {
     const { user: user2, token: token2 } = await createTestUser({ username: 'other_user' });
     const { user: actor } = await createTestUser({ username: 'notif_actor' });
 
-    await seedNotifications(user1._id, actor._id, 3);
+    await seedNotifications(user1.id, actor.id, 3);
 
     // user2 should see no notifications
     const res = await request(app)

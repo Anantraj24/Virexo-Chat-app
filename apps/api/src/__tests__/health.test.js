@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import app from '../app.js';
+import { setupTestDB, teardownTestDB, cleanCollections, prisma } from './testSetup.js';
 
 describe('Backend Core API Integration Tests', () => {
   it('GET /health should return 200 and healthy JSON status', async () => {

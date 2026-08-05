@@ -1,23 +1,13 @@
-import mongoose from 'mongoose';
+import prisma from './prisma.js';
 import { env } from './env.js';
 
 export const connectDB = async () => {
-  if (mongoose.connection.readyState === 1) {
-    return mongoose.connection;
-  }
-
-  const options = {
-    maxPoolSize: 10,
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
-  };
-
   try {
-    const conn = await mongoose.connect(env.MONGODB_URI, options);
-    console.log(`[MongoDB] Connected successfully to host: ${conn.connection.host}`);
-    return conn.connection;
+    await prisma.$connect();
+    console.log(`[PostgreSQL] Connected successfully to database via Prisma`);
+    return prisma;
   } catch (error) {
-    console.error('[MongoDB] Connection error:', error.message);
+    console.error('[PostgreSQL] Connection error:', error.message);
     if (!env.isTest) {
       process.exit(1);
     }
@@ -26,21 +16,16 @@ export const connectDB = async () => {
 };
 
 export const disconnectDB = async () => {
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.disconnect();
-    console.log('[MongoDB] Disconnected cleanly');
+  await prisma.$disconnect();
+  console.log('[PostgreSQL] Disconnected cleanly');
+};
+
+export const isDBConnected = async () => {
+  try {
+    // Simple query to verify connection
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch (err) {
+    return false;
   }
 };
-
-export const isDBConnected = () => {
-  return mongoose.connection.readyState === 1;
-};
-
-// Mongoose Connection Event Handlers
-mongoose.connection.on('error', (err) => {
-  console.error('[MongoDB] Runtime connection error:', err.message);
-});
-
-mongoose.connection.on('disconnected', () => {
-  console.warn('[MongoDB] Connection lost');
-});

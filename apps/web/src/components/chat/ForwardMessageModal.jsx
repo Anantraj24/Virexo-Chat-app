@@ -39,7 +39,7 @@ export function ForwardMessageModal({ isOpen, onClose, message }) {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     if (c.type === 'direct') {
-      const otherMember = c.members?.find((m) => (m.userId._id || m.userId).toString() !== user?._id);
+      const otherMember = c.members?.find((m) => (m.userId.id || m.userId).toString() !== user?.id);
       const name = otherMember?.userId?.displayName || otherMember?.userId?.username || '';
       return name.toLowerCase().includes(query);
     }
@@ -50,7 +50,7 @@ export function ForwardMessageModal({ isOpen, onClose, message }) {
     if (!message) return;
     setForwarding(true);
     try {
-      await forwardMessageRequest(message._id, { targetConversationId });
+      await forwardMessageRequest(message.id, { targetConversationId });
       addToast({ message: 'Message forwarded successfully', type: 'success' });
       onClose();
     } catch (err) {
@@ -61,7 +61,7 @@ export function ForwardMessageModal({ isOpen, onClose, message }) {
   };
 
   const getDMRecipient = (conv) => {
-    const otherMember = conv.members?.find((m) => (m.userId._id || m.userId).toString() !== user?._id);
+    const otherMember = conv.members?.find((m) => (m.userId.id || m.userId).toString() !== user?.id);
     return otherMember?.userId || { username: 'Unknown', displayName: 'Unknown' };
   };
 
@@ -109,8 +109,8 @@ export function ForwardMessageModal({ isOpen, onClose, message }) {
 
                 return (
                   <button
-                    key={conv._id}
-                    onClick={() => handleForward(conv._id)}
+                    key={conv.id}
+                    onClick={() => handleForward(conv.id)}
                     disabled={forwarding}
                     className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-zinc-800/50 transition group disabled:opacity-50"
                   >

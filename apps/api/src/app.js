@@ -30,7 +30,21 @@ app.use(requestIdMiddleware);
 app.use(helmet());
 app.use(
   cors({
-    origin: env.CLIENT_URL,
+    origin: (origin, callback) => {
+      // Allow dynamic local network origins in development
+      if (env.isDevelopment) {
+        if (!origin || origin.startsWith('http://localhost:') || origin.match(/^http:\/\/(192\.168\.|172\.|10\.)/)) {
+          return callback(null, true);
+        }
+      }
+      
+      // Fallback for production or specific origin
+      if (origin === env.CLIENT_URL || !origin) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   })
 );

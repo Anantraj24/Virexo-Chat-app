@@ -1,27 +1,18 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import app from '../app.js';
-import { User } from '../models/User.js';
-
-let mongoServer;
+import { setupTestDB, teardownTestDB, cleanCollections, prisma } from './testSetup.js';
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const uri = mongoServer.getUri();
-  await mongoose.connect(uri);
+  await setupTestDB();
 }, 60000);
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  if (mongoServer) {
-    await mongoServer.stop();
-  }
+  await teardownTestDB();
 });
 
 beforeEach(async () => {
-  await User.deleteMany({});
+  await cleanCollections();
 });
 
 describe('User Profile & Settings API Integration Tests', () => {

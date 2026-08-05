@@ -6,8 +6,8 @@ export const createDirectRules = [
     .trim()
     .notEmpty()
     .withMessage('Recipient user ID is required')
-    .isMongoId()
-    .withMessage('Recipient user ID must be a valid MongoDB ObjectId'),
+    .isString()
+    .withMessage('Recipient user ID must be a valid ID'),
   handleValidationErrors,
 ];
 
@@ -29,15 +29,15 @@ export const createGroupRules = [
     .withMessage('memberIds must be an array of user IDs'),
   body('memberIds.*')
     .optional()
-    .isMongoId()
-    .withMessage('Each member ID must be a valid MongoDB ObjectId'),
+    .isString()
+    .withMessage('Each member ID must be a valid ID'),
   handleValidationErrors,
 ];
 
 export const updateGroupRules = [
   param('id')
-    .isMongoId()
-    .withMessage('Invalid conversation ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   body('name')
     .optional()
     .trim()
@@ -58,34 +58,34 @@ export const updateGroupRules = [
 
 export const addMembersRules = [
   param('id')
-    .isMongoId()
-    .withMessage('Invalid conversation ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   body('memberIds')
     .isArray({ min: 1 })
     .withMessage('memberIds must be a non-empty array of user IDs'),
   body('memberIds.*')
-    .isMongoId()
-    .withMessage('Each member ID must be a valid MongoDB ObjectId'),
+    .isString()
+    .withMessage('Each member ID must be a valid ID'),
   handleValidationErrors,
 ];
 
 export const removeMemberRules = [
   param('id')
-    .isMongoId()
-    .withMessage('Invalid conversation ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   param('userId')
-    .isMongoId()
-    .withMessage('Invalid member user ID'),
+    .isString()
+    .withMessage('Invalid member ID'),
   handleValidationErrors,
 ];
 
 export const updateMemberRoleRules = [
   param('id')
-    .isMongoId()
-    .withMessage('Invalid conversation ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   param('userId')
-    .isMongoId()
-    .withMessage('Invalid member user ID'),
+    .isString()
+    .withMessage('Invalid member ID'),
   body('role')
     .isIn(['admin', 'member'])
     .withMessage('Role must be either admin or member'),
@@ -94,14 +94,14 @@ export const updateMemberRoleRules = [
 
 export const transferOwnershipRules = [
   param('id')
-    .isMongoId()
-    .withMessage('Invalid conversation ID'),
+    .isString()
+    .withMessage('Invalid ID'),
   body('newOwnerId')
     .trim()
     .notEmpty()
     .withMessage('newOwnerId is required')
-    .isMongoId()
-    .withMessage('newOwnerId must be a valid MongoDB ObjectId'),
+    .isString()
+    .withMessage('newOwnerId must be a valid ID'),
   handleValidationErrors,
 ];
 

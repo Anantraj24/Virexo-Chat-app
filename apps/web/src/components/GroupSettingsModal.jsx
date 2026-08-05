@@ -28,7 +28,7 @@ export function GroupSettingsModal({ isOpen, onClose, conversation, onUpdated })
   if (!conversation || conversation.type === 'direct') return null;
 
   const currentMemberInfo = conversation.members?.find(
-    (m) => (m.userId._id || m.userId).toString() === currentUser?._id
+    (m) => (m.userId.id || m.userId).toString() === currentUser?.id
   );
   const isOwner = currentMemberInfo?.role === 'owner';
   const isAdmin = currentMemberInfo?.role === 'admin' || isOwner;
@@ -37,7 +37,7 @@ export function GroupSettingsModal({ isOpen, onClose, conversation, onUpdated })
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await updateGroupRequest(conversation._id, { name, description });
+      const res = await updateGroupRequest(conversation.id, { name, description });
       addToast({ message: 'Group details updated!', type: 'success' });
       if (onUpdated) onUpdated(res.data.conversation);
     } catch (err) {
@@ -50,7 +50,7 @@ export function GroupSettingsModal({ isOpen, onClose, conversation, onUpdated })
   const handleRemoveMember = async (targetUserId) => {
     setActionLoading(true);
     try {
-      await removeMemberRequest(conversation._id, targetUserId);
+      await removeMemberRequest(conversation.id, targetUserId);
       addToast({ message: 'Member removed', type: 'info' });
       if (onUpdated) onUpdated();
     } catch (err) {
@@ -64,7 +64,7 @@ export function GroupSettingsModal({ isOpen, onClose, conversation, onUpdated })
     setActionLoading(true);
     const newRole = currentRole === 'admin' ? 'member' : 'admin';
     try {
-      await updateMemberRoleRequest(conversation._id, targetUserId, { role: newRole });
+      await updateMemberRoleRequest(conversation.id, targetUserId, { role: newRole });
       addToast({ message: `Role updated to ${newRole}`, type: 'success' });
       if (onUpdated) onUpdated();
     } catch (err) {
@@ -77,7 +77,7 @@ export function GroupSettingsModal({ isOpen, onClose, conversation, onUpdated })
   const handleTransferOwnership = async (newOwnerId) => {
     setActionLoading(true);
     try {
-      await transferOwnershipRequest(conversation._id, { newOwnerId });
+      await transferOwnershipRequest(conversation.id, { newOwnerId });
       addToast({ message: 'Ownership transferred!', type: 'success' });
       if (onUpdated) onUpdated();
     } catch (err) {
@@ -90,7 +90,7 @@ export function GroupSettingsModal({ isOpen, onClose, conversation, onUpdated })
   const handleLeaveGroup = async () => {
     setActionLoading(true);
     try {
-      await leaveGroupRequest(conversation._id);
+      await leaveGroupRequest(conversation.id);
       addToast({ message: 'You left the group channel', type: 'info' });
       onClose();
       navigate('/');
@@ -141,8 +141,8 @@ export function GroupSettingsModal({ isOpen, onClose, conversation, onUpdated })
           <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1">
             {conversation.members?.map((m) => {
               const u = m.userId;
-              const uId = (u._id || u).toString();
-              const isSelf = uId === currentUser?._id;
+              const uId = (u.id || u).toString();
+              const isSelf = uId === currentUser?.id;
 
               return (
                 <div

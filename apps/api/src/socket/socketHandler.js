@@ -1,5 +1,5 @@
 import { SOCKET_EVENTS } from '@virexo/shared';
-import { Conversation } from '../models/Conversation.js';
+import prisma from '../config/prisma.js';
 import { presenceManager } from './presenceManager.js';
 import { markDelivered, markRead, syncReceiptsForUser } from '../services/receiptService.js';
 
@@ -30,13 +30,17 @@ export function setupSocketHandlers(io, socket) {
         return;
       }
 
-      const conversation = await Conversation.findById(conversationId);
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        include: { members: true }
+      });
+      
       if (!conversation) {
         if (typeof ack === 'function') ack({ success: false, error: 'Conversation not found' });
         return;
       }
 
-      const isMember = conversation.members.some((m) => m.userId.toString() === userId);
+      const isMember = conversation.members.some((m) => m.userId === userId);
       if (!isMember) {
         if (typeof ack === 'function') ack({ success: false, error: 'Not a member of conversation' });
         return;

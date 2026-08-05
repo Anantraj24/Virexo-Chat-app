@@ -1,17 +1,23 @@
-import { Message } from '../models/Message.js';
-import { User } from '../models/User.js';
-import { Conversation } from '../models/Conversation.js';
+import prisma from '../config/prisma.js';
 import { createApiResponse } from '@virexo/shared';
 import { BadRequestError } from '../utils/errors.js';
 
 // Helper to sanitize public user profile (same as userController)
 function formatPublicProfile(user) {
-  const obj = typeof user.toJSON === 'function' ? user.toJSON() : user;
+  const obj = { ...user };
+  delete obj.passwordHash;
+  delete obj.emailVerificationToken;
+  delete obj.emailVerificationExpires;
+  delete obj.lastVerificationSentAt;
+  delete obj.passwordResetToken;
+  delete obj.passwordResetExpires;
   delete obj.email;
   delete obj.privacySettings;
   delete obj.notificationSettings;
-  if (user.privacySettings && !user.privacySettings.showOnlineStatus) obj.status = 'offline';
-  if (user.privacySettings && !user.privacySettings.showLastSeen) delete obj.lastSeen;
+
+  const privacySettings = typeof user.privacySettings === 'string' ? JSON.parse(user.privacySettings) : user.privacySettings || {};
+  if (privacySettings && !privacySettings.showOnlineStatus) obj.status = 'offline';
+  if (privacySettings && !privacySettings.showLastSeen) delete obj.lastSeen;
   return obj;
 }
 
@@ -34,55 +40,63 @@ export async function searchMessages(req, res, next) {
     }
 
     const maxLimit = Math.min(parseInt(limit, 10) || 20, 50);
-    const currentUserId = req.user._id.toString();
-
-    // Find all conversations the user is a member of to restrict search
-    let allowedConversationIds = [];
-    if (conversationId) {
-      const conv = await Conversation.findOne({
-        _id: conversationId,
-        'members.userId': currentUserId,
-      });
-      if (!conv) {
-        return res.status(200).json(createApiResponse(true, { messages: [], nextCursor: null }));
-      }
-      allowedConversationIds.push(conv._id);
-    } else {
-      const convs = await Conversation.find({ 'members.userId': currentUserId }, '_id');
-      allowedConversationIds = convs.map((c) => c._id);
-    }
-
-    if (allowedConversationIds.length === 0) {
-      return res.status(200).json(createApiResponse(true, { messages: [], nextCursor: null }));
-    }
+    const currentUserId = req.user.id || req.user.id;
 
     // Build query
-    const query = {
-      $text: { $search: q },
-      conversationId: { $in: allowedConversationIds },
+    const where = {
+      content: { contains: q, mode: 'insensitive' },
       isDeleted: false,
     };
 
-    if (senderId) query.senderId = senderId;
-    if (attachmentType) query['attachments.type'] = attachmentType;
+    if (conversationId) {
+      // Must also be a member of this conversation
+      where.conversationId = conversationId;
+      where.conversation = {
+        members: {
+          some: { userId: currentUserId }
+        }
+      };
+    } else {
+      // Must be a member of the conversation the message is in
+      where.conversation = {
+        members: {
+          some: { userId: currentUserId }
+        }
+      };
+    }
+
+    if (senderId) where.senderId = senderId;
+    
+    if (attachmentType) {
+      where.attachments = {
+        some: { type: attachmentType }
+      };
+    }
 
     if (startDate || endDate) {
-      query.createdAt = {};
-      if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) query.createdAt.$lte = new Date(endDate);
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate);
+      if (endDate) where.createdAt.lte = new Date(endDate);
     }
 
     if (cursor) {
-      query.createdAt = { ...query.createdAt, $lt: new Date(cursor) };
+      where.createdAt = { ...where.createdAt, lt: new Date(cursor) };
     }
 
-    // Execute search (sort by createdAt descending instead of text score for cursor pagination)
-    const messages = await Message.find(query)
-      .sort({ createdAt: -1 })
-      .limit(maxLimit)
-      .populate('senderId', '_id username displayName avatarUrl status role')
-      .populate('conversationId', '_id name type')
-      .lean();
+    // Execute search (sort by createdAt descending)
+    const messages = await prisma.message.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: maxLimit,
+      include: {
+        sender: {
+          select: { id: true, username: true, displayName: true, avatarUrl: true, status: true, role: true }
+        },
+        conversation: {
+          select: { id: true, name: true, type: true }
+        }
+      }
+    });
 
     const nextCursor =
       messages.length === maxLimit ? messages[messages.length - 1].createdAt.toISOString() : null;
@@ -104,13 +118,15 @@ export async function searchUsers(req, res, next) {
 
     const maxLimit = Math.min(parseInt(limit, 10) || 20, 50);
 
-    const users = await User.find(
-      { $text: { $search: q } },
-      { score: { $meta: 'textScore' } }
-    )
-      .sort({ score: { $meta: 'textScore' } })
-      .limit(maxLimit)
-      .lean();
+    const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          { username: { contains: q, mode: 'insensitive' } },
+          { displayName: { contains: q, mode: 'insensitive' } }
+        ]
+      },
+      take: maxLimit
+    });
 
     const sanitizedUsers = users.map(formatPublicProfile);
 
@@ -124,7 +140,7 @@ export async function searchUsers(req, res, next) {
 export async function searchConversations(req, res, next) {
   try {
     const { q, limit = 20 } = req.query;
-    const currentUserId = req.user._id.toString();
+    const currentUserId = req.user.id || req.user.id;
 
     if (!q) {
       throw new BadRequestError('Search query (q) is required');
@@ -132,18 +148,27 @@ export async function searchConversations(req, res, next) {
 
     const maxLimit = Math.min(parseInt(limit, 10) || 20, 50);
 
-    const conversations = await Conversation.find(
-      {
-        $text: { $search: q },
-        'members.userId': currentUserId,
+    const conversations = await prisma.conversation.findMany({
+      where: {
+        members: {
+          some: { userId: currentUserId }
+        },
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { description: { contains: q, mode: 'insensitive' } }
+        ]
       },
-      { score: { $meta: 'textScore' } }
-    )
-      .sort({ score: { $meta: 'textScore' } })
-      .limit(maxLimit)
-      .populate('members.userId', '_id username displayName avatarUrl status role')
-      .populate('lastMessageId')
-      .lean();
+      take: maxLimit,
+      include: {
+        members: {
+          include: {
+            user: {
+              select: { id: true, username: true, displayName: true, avatarUrl: true, status: true, role: true }
+            }
+          }
+        }
+      }
+    });
 
     res.status(200).json(createApiResponse(true, { conversations }));
   } catch (error) {

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Send, XCircle, RotateCcw, ArrowLeft, Edit2, Paperclip, FileText, Image as ImageIcon, Film, Mic, Square, Trash2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
@@ -122,7 +122,7 @@ export function MessageComposer({
   const handleSubmit = (e) => {
     e.preventDefault();
     if (editingMessage && onSubmitEdit) {
-      onSubmitEdit(editingMessage._id, inputText);
+      onSubmitEdit(editingMessage.id, inputText);
       onInputChange({ target: { value: '' } });
     } else {
       onSend(e);

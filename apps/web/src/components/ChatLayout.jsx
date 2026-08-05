@@ -40,8 +40,8 @@ export function ChatLayout() {
         conversation={chat.conversation}
         recipient={chat.getRecipient()}
         formatLastSeen={chat.formatLastSeen}
-        onReportUser={() => setReportTarget({ type: 'user', id: chat.getRecipient()?._id, name: chat.getRecipient()?.username })}
-        onReportConversation={() => setReportTarget({ type: 'conversation', id: chat.conversation?._id, name: chat.conversation?.name })}
+        onReportUser={() => setReportTarget({ type: 'user', id: chat.getRecipient()?.id, name: chat.getRecipient()?.username })}
+        onReportConversation={() => setReportTarget({ type: 'conversation', id: chat.conversation?.id, name: chat.conversation?.name })}
       />
 
       <MessageList
@@ -65,7 +65,7 @@ export function ChatLayout() {
         onUnpin={chat.handleUnpinMessage}
         onReaction={chat.handleAddReaction}
         onForward={(msg) => chat.setForwardingMessage(msg)}
-        onReport={(msg) => setReportTarget({ type: 'message', id: msg._id, name: 'this message' })}
+        onReport={(msg) => setReportTarget({ type: 'message', id: msg.id, name: 'this message' })}
       />
 
       <TypingIndicator typingUsers={chat.typingUsers} />

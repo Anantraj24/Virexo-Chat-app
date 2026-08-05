@@ -52,7 +52,11 @@ export function RegisterPage() {
       });
       navigate('/', { replace: true });
     } catch (err) {
-      setServerError(err.message || 'Registration failed. Please try again.');
+      if (err.details && Array.isArray(err.details)) {
+        setServerError(err.details.map(d => d.message).join(', '));
+      } else {
+        setServerError(err.message || 'Registration failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

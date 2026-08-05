@@ -1,29 +1,21 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import app from '../app.js';
-import { User } from '../models/User.js';
-import { Conversation } from '../models/Conversation.js';
+import { setupTestDB, teardownTestDB, cleanCollections, prisma } from './testSetup.js';
 
-let mongoServer;
+
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const uri = mongoServer.getUri();
-  await mongoose.connect(uri);
+  await setupTestDB();
+    await cleanCollections();
 }, 60000);
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  if (mongoServer) {
-    await mongoServer.stop();
-  }
+  await teardownTestDB();
 });
 
 beforeEach(async () => {
-  await User.deleteMany({});
-  await Conversation.deleteMany({});
+  await cleanCollections();
 });
 
 describe('Conversation Domain API Integration Tests', () => {
@@ -47,23 +39,23 @@ describe('Conversation Domain API Integration Tests', () => {
     const res1 = await request(app)
       .post('/api/v1/conversations/direct')
       .set('Authorization', `Bearer ${user1.token}`)
-      .send({ recipientId: user2.user._id });
+      .send({ recipientId: user2.user.id });
 
     expect(res1.status).toBe(201);
     expect(res1.body.success).toBe(true);
     expect(res1.body.data.conversation.type).toBe('direct');
     expect(res1.body.data.isExisting).toBe(false);
 
-    const firstConvId = res1.body.data.conversation._id;
+    const firstConvId = res1.body.data.conversation.id;
 
     // Second request: Reuses existing DM
     const res2 = await request(app)
       .post('/api/v1/conversations/direct')
       .set('Authorization', `Bearer ${user2.token}`)
-      .send({ recipientId: user1.user._id });
+      .send({ recipientId: user1.user.id });
 
     expect(res2.status).toBe(200);
-    expect(res2.body.data.conversation._id).toBe(firstConvId);
+    expect(res2.body.data.conversation.id).toBe(firstConvId);
     expect(res2.body.data.isExisting).toBe(true);
 
     // Verify DB count is strictly 1
@@ -81,7 +73,7 @@ describe('Conversation Domain API Integration Tests', () => {
       .send({
         name: 'Engineering General',
         description: 'Main dev discussion channel',
-        memberIds: [user2.user._id],
+        memberIds: [user2.user.id],
       });
 
     expect(res.status).toBe(201);
@@ -91,7 +83,7 @@ describe('Conversation Domain API Integration Tests', () => {
     const members = res.body.data.conversation.members;
     expect(members.length).toBe(2);
 
-    const ownerMember = members.find((m) => (m.userId._id || m.userId).toString() === user1.user._id);
+    const ownerMember = members.find((m) => (m.userId.id || m.userId).toString() === user1.user.id);
     expect(ownerMember.role).toBe('owner');
   });
 
@@ -104,7 +96,7 @@ describe('Conversation Domain API Integration Tests', () => {
       await request(app)
         .post('/api/v1/conversations/group')
         .set('Authorization', `Bearer ${user1.token}`)
-        .send({ name: `Group ${i}`, memberIds: [user2.user._id] });
+        .send({ name: `Group ${i}`, memberIds: [user2.user.id] });
     }
 
     const listRes = await request(app)
@@ -124,13 +116,13 @@ describe('Conversation Domain API Integration Tests', () => {
     const createRes = await request(app)
       .post('/api/v1/conversations/group')
       .set('Authorization', `Bearer ${user1.token}`)
-      .send({ name: 'Original Name', memberIds: [user2.user._id] });
+      .send({ name: 'Original Name', memberIds: [user2.user.id] });
 
     const group = createRes.body.data.conversation;
 
     // Regular member attempts update -> 403
     const forbiddenRes = await request(app)
-      .patch(`/api/v1/conversations/${group._id}`)
+      .patch(`/api/v1/conversations/${group.id}`)
       .set('Authorization', `Bearer ${user2.token}`)
       .send({ name: 'Hacked Name' });
 
@@ -139,7 +131,7 @@ describe('Conversation Domain API Integration Tests', () => {
 
     // Owner attempts update -> 200
     const ownerRes = await request(app)
-      .patch(`/api/v1/conversations/${group._id}`)
+      .patch(`/api/v1/conversations/${group.id}`)
       .set('Authorization', `Bearer ${user1.token}`)
       .send({ name: 'Updated Name' });
 
@@ -154,20 +146,20 @@ describe('Conversation Domain API Integration Tests', () => {
     const createRes = await request(app)
       .post('/api/v1/conversations/group')
       .set('Authorization', `Bearer ${user1.token}`)
-      .send({ name: 'Admin Test Group', memberIds: [user2.user._id] });
+      .send({ name: 'Admin Test Group', memberIds: [user2.user.id] });
 
     const group = createRes.body.data.conversation;
 
     // Promote user2 to admin
     const promoteRes = await request(app)
-      .patch(`/api/v1/conversations/${group._id}/members/${user2.user._id}/role`)
+      .patch(`/api/v1/conversations/${group.id}/members/${user2.user.id}/role`)
       .set('Authorization', `Bearer ${user1.token}`)
       .send({ role: 'admin' });
 
     expect(promoteRes.status).toBe(200);
 
     const promotedMember = promoteRes.body.data.conversation.members.find(
-      (m) => (m.userId._id || m.userId).toString() === user2.user._id
+      (m) => (m.userId.id || m.userId).toString() === user2.user.id
     );
     expect(promotedMember.role).toBe('admin');
   });
@@ -179,20 +171,20 @@ describe('Conversation Domain API Integration Tests', () => {
     const createRes = await request(app)
       .post('/api/v1/conversations/group')
       .set('Authorization', `Bearer ${user1.token}`)
-      .send({ name: 'Transfer Group', memberIds: [user2.user._id] });
+      .send({ name: 'Transfer Group', memberIds: [user2.user.id] });
 
     const group = createRes.body.data.conversation;
 
     const transferRes = await request(app)
-      .post(`/api/v1/conversations/${group._id}/transfer-ownership`)
+      .post(`/api/v1/conversations/${group.id}/transfer-ownership`)
       .set('Authorization', `Bearer ${user1.token}`)
-      .send({ newOwnerId: user2.user._id });
+      .send({ newOwnerId: user2.user.id });
 
     expect(transferRes.status).toBe(200);
 
     const members = transferRes.body.data.conversation.members;
-    const oldOwnerMember = members.find((m) => (m.userId._id || m.userId).toString() === user1.user._id);
-    const newOwnerMember = members.find((m) => (m.userId._id || m.userId).toString() === user2.user._id);
+    const oldOwnerMember = members.find((m) => (m.userId.id || m.userId).toString() === user1.user.id);
+    const newOwnerMember = members.find((m) => (m.userId.id || m.userId).toString() === user2.user.id);
 
     expect(oldOwnerMember.role).toBe('admin');
     expect(newOwnerMember.role).toBe('owner');

@@ -1,31 +1,21 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import app from '../app.js';
-import { User } from '../models/User.js';
-import { Conversation } from '../models/Conversation.js';
-import { Message } from '../models/Message.js';
+import { setupTestDB, teardownTestDB, cleanCollections, prisma } from './testSetup.js';
 
-let mongoServer;
+
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const uri = mongoServer.getUri();
-  await mongoose.connect(uri);
+  await setupTestDB();
+    await cleanCollections();
 }, 60000);
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  if (mongoServer) {
-    await mongoServer.stop();
-  }
+  await teardownTestDB();
 });
 
 beforeEach(async () => {
-  await User.deleteMany({});
-  await Conversation.deleteMany({});
-  await Message.deleteMany({});
+  await cleanCollections();
 });
 
 describe('Message REST Domain API Integration Tests', () => {
@@ -49,9 +39,9 @@ describe('Message REST Domain API Integration Tests', () => {
     const convRes = await request(app)
       .post('/api/v1/conversations/direct')
       .set('Authorization', `Bearer ${user1.token}`)
-      .send({ recipientId: user2.user._id });
+      .send({ recipientId: user2.user.id });
 
-    const conversationId = convRes.body.data.conversation._id;
+    const conversationId = convRes.body.data.conversation.id;
 
     // Send Message
     const msgRes = await request(app)
@@ -69,8 +59,8 @@ describe('Message REST Domain API Integration Tests', () => {
     expect(msgRes.body.data.message.senderId.username).toBe('sender_u');
 
     // Verify Conversation updated lastMessageId
-    const updatedConv = await Conversation.findById(conversationId);
-    expect(updatedConv.lastMessageId.toString()).toBe(msgRes.body.data.message._id);
+    const updatedConv = await prisma.conversation.findUnique({ where: { id: conversationId } });
+    expect(updatedConv.lastMessageId.toString()).toBe(msgRes.body.data.message.id);
   });
 
   it('POST /api/v1/messages should enforce idempotency key deduplication', async () => {
@@ -80,9 +70,9 @@ describe('Message REST Domain API Integration Tests', () => {
     const convRes = await request(app)
       .post('/api/v1/conversations/direct')
       .set('Authorization', `Bearer ${user1.token}`)
-      .send({ recipientId: user2.user._id });
+      .send({ recipientId: user2.user.id });
 
-    const conversationId = convRes.body.data.conversation._id;
+    const conversationId = convRes.body.data.conversation.id;
 
     // Send initial message with idempotency key
     const msgRes1 = await request(app)
@@ -108,7 +98,7 @@ describe('Message REST Domain API Integration Tests', () => {
 
     expect(msgRes2.status).toBe(200);
     expect(msgRes2.body.data.isExisting).toBe(true);
-    expect(msgRes2.body.data.message._id).toBe(msgRes1.body.data.message._id);
+    expect(msgRes2.body.data.message.id).toBe(msgRes1.body.data.message.id);
 
     // Verify DB count is 1
     const count = await Message.countDocuments();
@@ -122,9 +112,9 @@ describe('Message REST Domain API Integration Tests', () => {
     const convRes = await request(app)
       .post('/api/v1/conversations/direct')
       .set('Authorization', `Bearer ${user1.token}`)
-      .send({ recipientId: user2.user._id });
+      .send({ recipientId: user2.user.id });
 
-    const conversationId = convRes.body.data.conversation._id;
+    const conversationId = convRes.body.data.conversation.id;
 
     // Send 3 messages from user1
     for (let i = 1; i <= 3; i++) {
@@ -151,16 +141,16 @@ describe('Message REST Domain API Integration Tests', () => {
     const convRes = await request(app)
       .post('/api/v1/conversations/direct')
       .set('Authorization', `Bearer ${user1.token}`)
-      .send({ recipientId: user2.user._id });
+      .send({ recipientId: user2.user.id });
 
-    const conversationId = convRes.body.data.conversation._id;
+    const conversationId = convRes.body.data.conversation.id;
 
     const msgRes = await request(app)
       .post('/api/v1/messages')
       .set('Authorization', `Bearer ${user1.token}`)
       .send({ conversationId, content: 'Sensitive info' });
 
-    const messageId = msgRes.body.data.message._id;
+    const messageId = msgRes.body.data.message.id;
 
     // Delete message
     const deleteRes = await request(app)

@@ -90,9 +90,9 @@ export function NotificationBell() {
         ) : (
           notifications.map((notif) => (
             <div
-              key={notif._id}
+              key={notif.id}
               onClick={() => {
-                if (!notif.isRead) handleMarkRead(notif._id);
+                if (!notif.isRead) handleMarkRead(notif.id);
               }}
               className={cn(
                 "p-2 rounded-lg cursor-pointer flex gap-3 transition-colors group",
@@ -113,7 +113,7 @@ export function NotificationBell() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleMarkRead(notif._id);
+                        handleMarkRead(notif.id);
                       }}
                       className="text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"
                     >

@@ -37,7 +37,7 @@ export function ConversationListPage() {
   const directMessages = conversations.filter((c) => c.type === 'direct');
 
   const getDMRecipient = (conv) => {
-    const otherMember = conv.members?.find((m) => (m.userId._id || m.userId).toString() !== user?._id);
+    const otherMember = conv.members?.find((m) => (m.userId.id || m.userId).toString() !== user?.id);
     return otherMember?.userId || { username: 'Unknown User', displayName: 'Unknown User' };
   };
 
@@ -106,8 +106,8 @@ export function ConversationListPage() {
                 <nav className="space-y-0.5">
                   {filteredChannels.map((channel) => (
                     <button
-                      key={channel._id}
-                      onClick={() => navigate(`/channels/${channel._id}`)}
+                      key={channel.id}
+                      onClick={() => navigate(`/channels/${channel.id}`)}
                       className="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs font-medium text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200 transition"
                     >
                       <Hash className="w-3.5 h-3.5 shrink-0 opacity-70" />
@@ -126,8 +126,8 @@ export function ConversationListPage() {
                     const recipient = getDMRecipient(dm);
                     return (
                       <button
-                        key={dm._id}
-                        onClick={() => navigate(`/dms/${dm._id}`)}
+                        key={dm.id}
+                        onClick={() => navigate(`/dms/${dm.id}`)}
                         className="w-full flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs font-medium text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200 transition"
                       >
                         <Avatar name={recipient.displayName || recipient.username} src={recipient.avatarUrl} size="sm" status={recipient.status} />

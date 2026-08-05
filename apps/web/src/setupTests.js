@@ -1,18 +1,40 @@
 import '@testing-library/jest-dom';
+import { expect } from 'vitest';
+import * as matchers from '@testing-library/jest-dom/matchers';
+
+expect.extend(matchers);
 
 // Mock localStorage
-const localStorageMock = (() => {
+const localStorageMock = (function () {
   let store = {};
   return {
-    getItem: (key) => store[key] ?? null,
-    setItem: (key, value) => { store[key] = String(value); },
-    removeItem: (key) => { delete store[key]; },
-    clear: () => { store = {}; },
-    get length() { return Object.keys(store).length; },
-    key: (index) => Object.keys(store)[index] ?? null,
+    getItem: function (key) {
+      return store[key] || null;
+    },
+    setItem: function (key, value) {
+      store[key] = value.toString();
+    },
+    removeItem: function (key) {
+      delete store[key];
+    },
+    clear: function () {
+      store = {};
+    },
+    get length() {
+      return Object.keys(store).length;
+    },
+    key: function(index) {
+      return Object.keys(store)[index] || null;
+    }
   };
 })();
-Object.defineProperty(window, 'localStorage', { value: localStorageMock });
+
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
+  writable: true
+});
+global.localStorage = localStorageMock;
+globalThis.localStorage = localStorageMock;
 
 // Mock matchMedia
 Object.defineProperty(window, 'matchMedia', {

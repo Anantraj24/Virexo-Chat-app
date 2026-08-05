@@ -16,7 +16,7 @@ describe('Message Domain Frontend Helpers', () => {
 
   it('should correctly format soft-deleted message text', () => {
     const rawMsg = {
-      _id: 'msg1',
+      id: 'msg1',
       content: 'Original secret text',
       isDeleted: false,
     };

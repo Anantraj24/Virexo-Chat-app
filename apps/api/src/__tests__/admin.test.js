@@ -1,55 +1,45 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import app from '../app.js';
-import { User } from '../models/User.js';
-import { Report } from '../models/Report.js';
+import { setupTestDB, teardownTestDB, cleanCollections, prisma } from './testSetup.js';
 import { generateAccessToken } from '../utils/token.js';
 
 describe('Admin and Moderation API Integration Tests', () => {
   let adminUser, regularUser, suspendedUser, reportedUser;
   let adminToken, regularToken, suspendedToken;
-  let mongoServer;
-
   beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
-    const uri = mongoServer.getUri();
-    await mongoose.connect(uri);
-
-    // Clear collections
-    await User.deleteMany({});
-    await Report.deleteMany({});
+  await setupTestDB();
+  await cleanCollections();
 
     // Create users
-    adminUser = await User.create({
+    adminUser = await prisma.user.create({ data: {
       username: 'adminuser',
       email: 'admin@example.com',
       passwordHash: 'hashedpassword',
       role: 'admin',
-    });
+    } });
 
-    regularUser = await User.create({
+    regularUser = await prisma.user.create({ data: {
       username: 'regularuser',
       email: 'user@example.com',
       passwordHash: 'hashedpassword',
       role: 'user',
-    });
+    } });
 
-    suspendedUser = await User.create({
+    suspendedUser = await prisma.user.create({ data: {
       username: 'suspendeduser',
       email: 'suspended@example.com',
       passwordHash: 'hashedpassword',
       role: 'user',
       accountStatus: 'suspended',
-    });
+    } });
 
-    reportedUser = await User.create({
+    reportedUser = await prisma.user.create({ data: {
       username: 'reporteduser',
       email: 'reported@example.com',
       passwordHash: 'hashedpassword',
       role: 'user',
-    });
+    } });
 
     adminToken = generateAccessToken(adminUser);
     regularToken = generateAccessToken(regularUser);
@@ -57,11 +47,8 @@ describe('Admin and Moderation API Integration Tests', () => {
   });
 
   afterAll(async () => {
-    await mongoose.disconnect();
-    if (mongoServer) {
-      await mongoServer.stop();
-    }
-  });
+  await teardownTestDB();
+});
 
   describe('Suspended User Restrictions', () => {
     it('should reject API requests from a suspended user', async () => {
@@ -91,7 +78,7 @@ describe('Admin and Moderation API Integration Tests', () => {
         .post('/api/v1/reports')
         .set('Authorization', `Bearer ${regularToken}`)
         .send({
-          reportedUserId: reportedUser._id.toString(),
+          reportedUserId: reportedUser.id.toString(),
           reason: 'harassment',
           description: 'They are being mean',
         });
@@ -106,7 +93,7 @@ describe('Admin and Moderation API Integration Tests', () => {
         .post('/api/v1/reports')
         .set('Authorization', `Bearer ${regularToken}`)
         .send({
-          reportedUserId: reportedUser._id.toString(),
+          reportedUserId: reportedUser.id.toString(),
           reason: 'spam',
           description: 'Spamming now',
         });
@@ -139,12 +126,12 @@ describe('Admin and Moderation API Integration Tests', () => {
       expect(res.body.data.reports).toBeInstanceOf(Array);
       expect(res.body.data.reports.length).toBe(1);
       
-      reportId = res.body.data.reports[0]._id;
+      reportId = res.body.data.reports[0].id;
     });
 
     it('should allow an admin to suspend a user', async () => {
       const res = await request(app)
-        .patch(`/api/v1/admin/users/${reportedUser._id}/status`)
+        .patch(`/api/v1/admin/users/${reportedUser.id}/status`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ accountStatus: 'suspended' });
       
@@ -154,15 +141,15 @@ describe('Admin and Moderation API Integration Tests', () => {
 
     it('should not allow an admin to suspend another admin', async () => {
       // Create another admin
-      const anotherAdmin = await User.create({
+      const anotherAdmin = await prisma.user.create({ data: {
         username: 'adminuser2',
         email: 'admin2@example.com',
         passwordHash: 'hashedpassword',
         role: 'admin',
-      });
+      } });
 
       const res = await request(app)
-        .patch(`/api/v1/admin/users/${anotherAdmin._id}/status`)
+        .patch(`/api/v1/admin/users/${anotherAdmin.id}/status`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ accountStatus: 'suspended' });
       

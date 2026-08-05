@@ -1,28 +1,19 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import app from '../app.js';
-import { User } from '../models/User.js';
+import { setupTestDB, teardownTestDB, cleanCollections, prisma } from './testSetup.js';
 import { hashToken } from '../utils/token.js';
 
-let mongoServer;
-
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const uri = mongoServer.getUri();
-  await mongoose.connect(uri);
+  await setupTestDB();
 }, 60000);
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  if (mongoServer) {
-    await mongoServer.stop();
-  }
+  await teardownTestDB();
 });
 
 beforeEach(async () => {
-  await User.deleteMany({});
+  await cleanCollections();
 });
 
 describe('Email Verification & Password Recovery Integration Tests', () => {
@@ -37,17 +28,21 @@ describe('Email Verification & Password Recovery Integration Tests', () => {
     const res = await request(app).post('/api/v1/auth/signup').send(testUser);
     expect(res.status).toBe(201);
 
-    const dbUser = await User.findOne({ email: testUser.email });
+    const dbUser = await prisma.user.findFirst({ where: { email: testUser.email } });
     // The raw token isn't directly available after signup (fire-and-forget),
     // so we generate a known token and set it directly for testing
     const crypto = await import('node:crypto');
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = hashToken(rawToken);
 
-    dbUser.emailVerificationToken = hashedToken;
-    dbUser.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    dbUser.lastVerificationSentAt = new Date(Date.now() - 120 * 1000); // 2 min ago (past cooldown)
-    await dbUser.save();
+    await prisma.user.update({
+      where: { id: dbUser.id },
+      data: {
+        emailVerificationToken: hashedToken,
+        emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        lastVerificationSentAt: new Date(Date.now() - 120 * 1000)
+      }
+    });
 
     return { signupRes: res, rawToken, dbUser };
   }
@@ -61,7 +56,7 @@ describe('Email Verification & Password Recovery Integration Tests', () => {
     expect(res.body.data.user.isEmailVerified).toBe(false);
 
     // Verify token fields are set in DB but NOT leaked in response
-    const dbUser = await User.findOne({ email: testUser.email });
+    const dbUser = await prisma.user.findFirst({ where: { email: testUser.email } });
     expect(dbUser.isEmailVerified).toBe(false);
     expect(dbUser.emailVerificationToken).toBeTruthy();
     expect(dbUser.emailVerificationExpires).toBeTruthy();
@@ -86,7 +81,7 @@ describe('Email Verification & Password Recovery Integration Tests', () => {
     expect(res.body.data.message).toContain('verified');
 
     // Verify DB state
-    const dbUser = await User.findOne({ email: testUser.email });
+    const dbUser = await prisma.user.findFirst({ where: { email: testUser.email } });
     expect(dbUser.isEmailVerified).toBe(true);
     expect(dbUser.emailVerificationToken).toBeNull();
     expect(dbUser.emailVerificationExpires).toBeNull();
@@ -108,10 +103,7 @@ describe('Email Verification & Password Recovery Integration Tests', () => {
     const { rawToken } = await signupAndGetToken();
 
     // Expire the token
-    await User.updateOne(
-      { email: testUser.email },
-      { emailVerificationExpires: new Date(Date.now() - 1000) }
-    );
+    await prisma.user.updateMany({ where: { email: testUser.email }, data: { emailVerificationExpires: new Date(Date.now() - 1000) } });
 
     const res = await request(app)
       .post('/api/v1/auth/verify-email')
@@ -141,10 +133,7 @@ describe('Email Verification & Password Recovery Integration Tests', () => {
     const token = signupRes.body.data.accessToken;
 
     // Set lastVerificationSentAt to just now (within cooldown)
-    await User.updateOne(
-      { email: testUser.email },
-      { lastVerificationSentAt: new Date() }
-    );
+    await prisma.user.updateMany({ where: { email: testUser.email }, data: { lastVerificationSentAt: new Date() } });
 
     const res = await request(app)
       .post('/api/v1/auth/resend-verification')
@@ -159,7 +148,7 @@ describe('Email Verification & Password Recovery Integration Tests', () => {
     const token = signupRes.body.data.accessToken;
 
     // Mark email as verified
-    await User.updateOne({ email: testUser.email }, { isEmailVerified: true });
+    await prisma.user.updateMany({ where: { email: testUser.email }, data: { isEmailVerified: true } });
 
     const res = await request(app)
       .post('/api/v1/auth/resend-verification')
@@ -191,7 +180,7 @@ describe('Email Verification & Password Recovery Integration Tests', () => {
     expect(res.body.success).toBe(true);
 
     // Verify DB has reset token
-    const dbUser = await User.findOne({ email: testUser.email });
+    const dbUser = await prisma.user.findFirst({ where: { email: testUser.email } });
     expect(dbUser.passwordResetToken).toBeTruthy();
     expect(dbUser.passwordResetExpires).toBeTruthy();
     expect(dbUser.passwordResetExpires.getTime()).toBeGreaterThan(Date.now());
@@ -207,13 +196,10 @@ describe('Email Verification & Password Recovery Integration Tests', () => {
     const rawResetToken = crypto.randomBytes(32).toString('hex');
     const hashedResetToken = hashToken(rawResetToken);
 
-    await User.updateOne(
-      { email: testUser.email },
-      {
+    await prisma.user.updateMany({ where: { email: testUser.email }, data: {
         passwordResetToken: hashedResetToken,
         passwordResetExpires: new Date(Date.now() + 60 * 60 * 1000),
-      }
-    );
+      } });
 
     const newPassword = 'NewSecurePass456!';
     const res = await request(app)
@@ -225,7 +211,7 @@ describe('Email Verification & Password Recovery Integration Tests', () => {
     expect(res.body.data.message).toContain('Password reset successfully');
 
     // Verify all sessions revoked
-    const dbUser = await User.findOne({ email: testUser.email });
+    const dbUser = await prisma.user.findFirst({ where: { email: testUser.email }, include: { refreshTokenHashes: true } });
     expect(dbUser.refreshTokenHashes.length).toBe(0);
     expect(dbUser.passwordResetToken).toBeNull();
     expect(dbUser.passwordResetExpires).toBeNull();
@@ -262,13 +248,10 @@ describe('Email Verification & Password Recovery Integration Tests', () => {
     const hashedResetToken = hashToken(rawResetToken);
 
     // Set an already-expired token
-    await User.updateOne(
-      { email: testUser.email },
-      {
+    await prisma.user.updateMany({ where: { email: testUser.email }, data: {
         passwordResetToken: hashedResetToken,
         passwordResetExpires: new Date(Date.now() - 1000),
-      }
-    );
+      } });
 
     const res = await request(app)
       .post('/api/v1/auth/reset-password')

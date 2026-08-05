@@ -183,15 +183,15 @@ export default function SearchModal({ isOpen, onClose, onJumpToMessage, onStartC
                 </div>
               ) : results[activeTab]?.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-text-muted">
-                  <p>No results found for "{query}"</p>
+                  <p>No results found for &quot;{query}&quot;</p>
                 </div>
               ) : (
                 <div className="space-y-1">
                   {activeTab === 'messages' && results.messages.map((msg) => (
                     <button
-                      key={msg._id}
+                      key={msg.id}
                       onClick={() => {
-                        onJumpToMessage(msg.conversationId?._id || msg.conversationId, msg._id);
+                        onJumpToMessage(msg.conversationId?.id || msg.conversationId, msg.id);
                         onClose();
                       }}
                       className="w-full text-left p-3 hover:bg-surface-light rounded-lg transition-colors flex gap-3 group"
@@ -222,9 +222,9 @@ export default function SearchModal({ isOpen, onClose, onJumpToMessage, onStartC
 
                   {activeTab === 'users' && results.users.map((u) => (
                     <button
-                      key={u._id}
+                      key={u.id}
                       onClick={() => {
-                        onStartConversation(u._id);
+                        onStartConversation(u.id);
                         onClose();
                       }}
                       className="w-full text-left p-3 hover:bg-surface-light rounded-lg transition-colors flex items-center gap-3"
@@ -248,7 +248,7 @@ export default function SearchModal({ isOpen, onClose, onJumpToMessage, onStartC
 
                   {activeTab === 'conversations' && results.conversations.map((conv) => {
                     const isGroup = conv.type === 'group';
-                    const otherMember = !isGroup ? conv.members.find(m => m.userId?._id !== user?._id)?.userId : null;
+                    const otherMember = !isGroup ? conv.members.find(m => m.userId?.id !== user?.id)?.userId : null;
                     
                     const avatarUrl = isGroup 
                       ? (conv.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.name || 'Group')}&background=random`)
@@ -258,9 +258,9 @@ export default function SearchModal({ isOpen, onClose, onJumpToMessage, onStartC
 
                     return (
                       <button
-                        key={conv._id}
+                        key={conv.id}
                         onClick={() => {
-                          onStartConversation(conv._id, true);
+                          onStartConversation(conv.id, true);
                           onClose();
                         }}
                         className="w-full text-left p-3 hover:bg-surface-light rounded-lg transition-colors flex items-center gap-3"

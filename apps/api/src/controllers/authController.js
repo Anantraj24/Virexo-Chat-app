@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { User } from '../models/User.js';
+import prisma from '../config/prisma.js';
 import {
   hashPassword,
   comparePassword,
@@ -49,8 +49,13 @@ export async function signup(req, res, next) {
   try {
     const { username, email, password } = req.body;
 
-    const existingUser = await User.findOne({
-      $or: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }],
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: email.toLowerCase() },
+          { username: username.toLowerCase() }
+        ]
+      }
     });
 
     if (existingUser) {
@@ -65,29 +70,33 @@ export async function signup(req, res, next) {
     // Generate email verification token
     const rawVerificationToken = generateSecureToken();
     const hashedVerificationToken = hashToken(rawVerificationToken);
-
-    const user = new User({
-      username,
-      email,
-      passwordHash,
-      isEmailVerified: false,
-      emailVerificationToken: hashedVerificationToken,
-      emailVerificationExpires: new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000),
-      lastVerificationSentAt: new Date(),
-      refreshTokenHashes: [],
+    const familyId = crypto.randomUUID();
+    
+    // We need to create the user and their first refresh token in a transaction
+    // Or sequentially, since we need user ID for the token
+    const user = await prisma.user.create({
+      data: {
+        username: username.toLowerCase(),
+        email: email.toLowerCase(),
+        passwordHash,
+        isEmailVerified: false,
+        emailVerificationToken: hashedVerificationToken,
+        emailVerificationExpires: new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000),
+        lastVerificationSentAt: new Date(),
+      }
     });
 
-    const familyId = crypto.randomUUID();
     const { token: refreshToken, expiresInDays } = generateRefreshToken(user, familyId, true);
     const hashedRefresh = hashToken(refreshToken);
 
-    user.refreshTokenHashes.push({
-      hash: hashedRefresh,
-      familyId,
-      expiresAt: new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000),
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        hash: hashedRefresh,
+        familyId,
+        expiresAt: new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000),
+      }
     });
-
-    await user.save();
 
     // Fire-and-forget: send verification email (signup succeeds even if email fails)
     sendVerificationEmail(user.email, user.username, rawVerificationToken);
@@ -95,9 +104,15 @@ export async function signup(req, res, next) {
     setRefreshTokenCookie(res, refreshToken, expiresInDays);
     const accessToken = generateAccessToken(user);
 
+    const safeUser = { ...user };
+    delete safeUser.passwordHash;
+    delete safeUser.emailVerificationToken;
+    delete safeUser.emailVerificationExpires;
+    delete safeUser.passwordResetToken;
+
     res.status(201).json(
       createApiResponse(true, {
-        user: user.toJSON(),
+        user: safeUser,
         accessToken,
       })
     );
@@ -111,7 +126,7 @@ export async function login(req, res, next) {
   try {
     const { email, password, rememberMe = true } = req.body;
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (!user) {
       throw new UnauthorizedError('Invalid email or password', 'INVALID_CREDENTIALS');
     }
@@ -126,24 +141,36 @@ export async function login(req, res, next) {
     const hashedRefresh = hashToken(refreshToken);
 
     // Limit active sessions array to max 10 sessions per user
-    if (user.refreshTokenHashes.length >= 10) {
-      user.refreshTokenHashes.shift();
-    }
-
-    user.refreshTokenHashes.push({
-      hash: hashedRefresh,
-      familyId,
-      expiresAt: new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000),
+    const userTokens = await prisma.refreshToken.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'asc' }
     });
 
-    await user.save();
+    if (userTokens.length >= 10) {
+      // Delete the oldest token
+      await prisma.refreshToken.delete({ where: { id: userTokens[0].id } });
+    }
+
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        hash: hashedRefresh,
+        familyId,
+        expiresAt: new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000),
+      }
+    });
 
     setRefreshTokenCookie(res, refreshToken, expiresInDays);
     const accessToken = generateAccessToken(user);
 
+    const safeUser = { ...user };
+    delete safeUser.passwordHash;
+    delete safeUser.emailVerificationToken;
+    delete safeUser.passwordResetToken;
+
     res.status(200).json(
       createApiResponse(true, {
-        user: user.toJSON(),
+        user: safeUser,
         accessToken,
       })
     );
@@ -167,20 +194,29 @@ export async function refresh(req, res, next) {
     }
 
     const hashedInput = hashToken(rawRefreshToken);
-    const user = await User.findById(decoded.userId);
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
 
     if (!user) {
       clearRefreshTokenCookie(res);
       throw new UnauthorizedError('User session not found', 'USER_NOT_FOUND');
     }
 
-    const tokenIndex = user.refreshTokenHashes.findIndex((t) => t.hash === hashedInput);
+    const existingToken = await prisma.refreshToken.findFirst({
+      where: { 
+        userId: user.id,
+        hash: hashedInput 
+      }
+    });
 
     // TOKEN REUSE DETECTION TRIGGERED
-    if (tokenIndex === -1) {
-      // Invalidate ALL tokens in this family or user account
-      user.refreshTokenHashes = user.refreshTokenHashes.filter((t) => t.familyId !== decoded.familyId);
-      await user.save();
+    if (!existingToken) {
+      // Invalidate ALL tokens in this family
+      await prisma.refreshToken.deleteMany({
+        where: {
+          userId: user.id,
+          familyId: decoded.familyId
+        }
+      });
       clearRefreshTokenCookie(res);
       throw new UnauthorizedError(
         'Security alert: Attempted reuse of revoked token. Session revoked.',
@@ -189,18 +225,19 @@ export async function refresh(req, res, next) {
     }
 
     // Token is valid -> ROTATE
-    user.refreshTokenHashes.splice(tokenIndex, 1);
+    await prisma.refreshToken.delete({ where: { id: existingToken.id } });
 
     const { token: newRefreshToken, expiresInDays } = generateRefreshToken(user, decoded.familyId, true);
     const newHashedRefresh = hashToken(newRefreshToken);
 
-    user.refreshTokenHashes.push({
-      hash: newHashedRefresh,
-      familyId: decoded.familyId,
-      expiresAt: new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000),
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        hash: newHashedRefresh,
+        familyId: decoded.familyId,
+        expiresAt: new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000),
+      }
     });
-
-    await user.save();
 
     setRefreshTokenCookie(res, newRefreshToken, expiresInDays);
     const accessToken = generateAccessToken(user);
@@ -224,8 +261,11 @@ export async function logout(req, res, next) {
       const decoded = verifyRefreshToken(rawRefreshToken);
 
       if (decoded?.userId) {
-        await User.findByIdAndUpdate(decoded.userId, {
-          $pull: { refreshTokenHashes: { hash: hashedInput } },
+        await prisma.refreshToken.deleteMany({
+          where: {
+            userId: decoded.userId,
+            hash: hashedInput
+          }
         });
       }
     }
@@ -240,9 +280,9 @@ export async function logout(req, res, next) {
 // Logout All Sessions Controller
 export async function logoutAll(req, res, next) {
   try {
-    const userId = req.user._id;
-    await User.findByIdAndUpdate(userId, {
-      $set: { refreshTokenHashes: [] },
+    const userId = req.user.id || req.user.id;
+    await prisma.refreshToken.deleteMany({
+      where: { userId }
     });
 
     clearRefreshTokenCookie(res);
@@ -254,7 +294,13 @@ export async function logoutAll(req, res, next) {
 
 // Get Current User Profile Controller
 export async function getMe(req, res) {
-  res.status(200).json(createApiResponse(true, { user: req.user.toJSON() }));
+  // Ensure req.user doesn't have sensitive data if it's already stripped, but for safety:
+  const safeUser = { ...req.user };
+  delete safeUser.passwordHash;
+  delete safeUser.emailVerificationToken;
+  delete safeUser.passwordResetToken;
+  
+  res.status(200).json(createApiResponse(true, { user: safeUser }));
 }
 
 // ─── Email Verification & Password Recovery ─────────────────────────────
@@ -265,19 +311,25 @@ export async function verifyEmail(req, res, next) {
     const { token } = req.body;
     const hashedToken = hashToken(token);
 
-    const user = await User.findOne({
-      emailVerificationToken: hashedToken,
-      emailVerificationExpires: { $gt: new Date() },
+    const user = await prisma.user.findFirst({
+      where: {
+        emailVerificationToken: hashedToken,
+        emailVerificationExpires: { gt: new Date() },
+      }
     });
 
     if (!user) {
       throw new BadRequestError('Verification token is invalid or has expired', 'INVALID_VERIFICATION_TOKEN');
     }
 
-    user.isEmailVerified = true;
-    user.emailVerificationToken = null;
-    user.emailVerificationExpires = null;
-    await user.save();
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        isEmailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+      }
+    });
 
     res.status(200).json(
       createApiResponse(true, { message: 'Email verified successfully' })
@@ -290,7 +342,8 @@ export async function verifyEmail(req, res, next) {
 // Resend Verification Email Controller
 export async function resendVerification(req, res, next) {
   try {
-    const user = await User.findById(req.user._id);
+    const userId = req.user.id || req.user.id;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
 
     if (user.isEmailVerified) {
       throw new BadRequestError('Email is already verified', 'ALREADY_VERIFIED');
@@ -311,10 +364,14 @@ export async function resendVerification(req, res, next) {
     const rawToken = generateSecureToken();
     const hashedToken = hashToken(rawToken);
 
-    user.emailVerificationToken = hashedToken;
-    user.emailVerificationExpires = new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
-    user.lastVerificationSentAt = new Date();
-    await user.save();
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationToken: hashedToken,
+        emailVerificationExpires: new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000),
+        lastVerificationSentAt: new Date(),
+      }
+    });
 
     await sendVerificationEmail(user.email, user.username, rawToken);
 
@@ -336,7 +393,7 @@ export async function forgotPassword(req, res, next) {
       message: 'If an account with that email exists, a password reset link has been sent',
     });
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (!user) {
       return res.status(200).json(successResponse);
     }
@@ -344,9 +401,13 @@ export async function forgotPassword(req, res, next) {
     const rawToken = generateSecureToken();
     const hashedToken = hashToken(rawToken);
 
-    user.passwordResetToken = hashedToken;
-    user.passwordResetExpires = new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
-    await user.save();
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken: hashedToken,
+        passwordResetExpires: new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000),
+      }
+    });
 
     await sendPasswordResetEmail(user.email, user.username, rawToken);
 
@@ -362,26 +423,33 @@ export async function resetPassword(req, res, next) {
     const { token, password } = req.body;
     const hashedToken = hashToken(token);
 
-    const user = await User.findOne({
-      passwordResetToken: hashedToken,
-      passwordResetExpires: { $gt: new Date() },
+    const user = await prisma.user.findFirst({
+      where: {
+        passwordResetToken: hashedToken,
+        passwordResetExpires: { gt: new Date() },
+      }
     });
 
     if (!user) {
       throw new BadRequestError('Reset token is invalid or has expired', 'INVALID_RESET_TOKEN');
     }
 
-    // Update password
-    user.passwordHash = await hashPassword(password);
+    // Update password and clear reset token
+    const passwordHash = await hashPassword(password);
 
-    // Clear reset token fields
-    user.passwordResetToken = null;
-    user.passwordResetExpires = null;
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      }
+    });
 
     // Revoke all active sessions (security: force re-authentication)
-    user.refreshTokenHashes = [];
-
-    await user.save();
+    await prisma.refreshToken.deleteMany({
+      where: { userId: user.id }
+    });
 
     res.status(200).json(
       createApiResponse(true, { message: 'Password reset successfully. Please log in with your new password.' })

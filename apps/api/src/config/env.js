@@ -1,11 +1,17 @@
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '../../.env'), override: true });
 
 export const env = {
   PORT: process.env.PORT || '5000',
   NODE_ENV: process.env.NODE_ENV || 'development',
   CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:5173',
+  DATABASE_URL: process.env.DATABASE_URL,
   MONGODB_URI: process.env.MONGODB_URI || 'mongodb://localhost:27017/virexo',
   JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET || 'development_access_token_secret_32chars_min',
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'development_refresh_token_secret_32chars_min',

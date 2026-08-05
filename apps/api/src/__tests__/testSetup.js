@@ -1,51 +1,47 @@
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import request from 'supertest';
 import app from '../app.js';
-import { User } from '../models/User.js';
-import { Conversation } from '../models/Conversation.js';
-import { Message } from '../models/Message.js';
-import { Notification } from '../models/Notification.js';
-import { Report } from '../models/Report.js';
-import { AdminAuditLog } from '../models/AdminAuditLog.js';
+import prisma from '../config/prisma.js';
 import { generateAccessToken } from '../utils/token.js';
 
-let mongoServer;
-
 /**
- * Start an in-memory MongoDB instance and connect Mongoose.
- * Call in beforeAll with a generous timeout.
+ * Setup hook for Prisma (if needed).
  */
-export async function setupMongoMemory() {
-  mongoServer = await MongoMemoryServer.create();
-  const uri = mongoServer.getUri();
-  await mongoose.connect(uri);
+export async function setupTestDB() {
+  // Can be used to run migrations or seed data if needed before tests
 }
 
 /**
- * Disconnect Mongoose and stop the in-memory MongoDB.
- * Call in afterAll.
+ * Teardown hook for Prisma.
  */
-export async function teardownMongoMemory() {
-  await mongoose.disconnect();
-  if (mongoServer) {
-    await mongoServer.stop();
-  }
+export async function teardownTestDB() {
+  await prisma.$disconnect();
 }
 
 /**
  * Delete all documents from every collection used in tests.
  * Call in beforeEach for test isolation.
+ * VERY IMPORTANT: ONLY runs if NODE_ENV is 'test'
  */
 export async function cleanCollections() {
-  const collections = [User, Conversation, Message];
+  if (process.env.NODE_ENV !== 'test') {
+    throw new Error('cleanCollections can only be run in the test environment');
+  }
 
-  // Only clean models that exist (some tests may not import all)
-  try { await Notification.deleteMany({}); } catch { /* model may not exist */ }
-  try { await Report.deleteMany({}); } catch { /* model may not exist */ }
-  try { await AdminAuditLog.deleteMany({}); } catch { /* model may not exist */ }
-
-  await Promise.all(collections.map((Model) => Model.deleteMany({})));
+  // Delete all records in reverse dependency order
+  await prisma.$transaction([
+    prisma.adminAuditLog.deleteMany({}),
+    prisma.report.deleteMany({}),
+    prisma.notification.deleteMany({}),
+    prisma.messageAudit.deleteMany({}),
+    prisma.readReceipt.deleteMany({}),
+    prisma.reaction.deleteMany({}),
+    prisma.attachment.deleteMany({}),
+    prisma.message.deleteMany({}),
+    prisma.conversationMember.deleteMany({}),
+    prisma.conversation.deleteMany({}),
+    prisma.refreshToken.deleteMany({}),
+    prisma.user.deleteMany({}),
+  ]);
 }
 
 /**
@@ -65,7 +61,7 @@ export async function createTestUser(overrides = {}) {
     ...overrides,
   };
 
-  const user = await User.create(defaults);
+  const user = await prisma.user.create({ data: defaults });
   const token = generateAccessToken(user);
   return { user, token };
 }
@@ -100,11 +96,19 @@ export async function signupUser(username, email, password = 'Password123!') {
  * @returns {object} Conversation document
  */
 export async function createConversation(members, type = 'group', extraFields = {}) {
-  return Conversation.create({
-    type,
-    members,
-    name: type === 'group' ? `Group_${Date.now()}` : undefined,
-    ...extraFields,
+  return prisma.conversation.create({
+    data: {
+      type,
+      name: type === 'group' ? `Group_${Date.now()}` : "",
+      ...extraFields,
+      members: {
+        create: members.map(m => ({
+          userId: m.userId,
+          role: m.role || 'member'
+        }))
+      }
+    },
+    include: { members: true }
   });
 }
 
@@ -123,4 +127,4 @@ export async function sendMessage(token, conversationId, content = 'Hello!') {
     .send({ conversationId, content });
 }
 
-export { app, request, mongoose };
+export { app, request, prisma };

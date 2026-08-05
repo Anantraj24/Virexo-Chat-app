@@ -2,137 +2,190 @@
 
 ## 1. Overview & Data Design Strategy
 
-Virexo uses MongoDB Atlas (M0 Free Tier) with Mongoose ORM. The data model balances document embedding for read speed (e.g. member sub-documents in conversations) with normalized references for unbounded collections (e.g. messages linked to conversations).
+Virexo uses PostgreSQL (Neon Free Tier) with Prisma ORM. The data model balances strict relational integrity (Foreign Keys, Cascades) with high-performance querying suitable for a real-time chat application.
 
 ---
 
-## 2. Collections & Entity Schemas
+## 2. Tables & Entity Schemas (Prisma)
 
-### 2.1 User Collection (`users`)
+### 2.1 User Table (`User`)
 
 Stores user credentials, profile settings, presence metadata, and active refresh token session hashes.
 
-```typescript
-interface IUser {
-  _id: Types.ObjectId;
-  username: string;          // Indexed, Unique, lowercase
-  email: string;             // Indexed, Unique, lowercase
-  passwordHash: string;      // bcrypt hash
-  avatarUrl?: string;        // Cloudinary CDN URL
-  avatarPublicId?: string;   // Cloudinary public ID for deletion
-  bio?: string;              // Max 200 chars
-  status: 'online' | 'offline' | 'away';
-  role: 'user' | 'admin';
-  refreshTokenHashes: Array<{
-    hash: string;
-    createdAt: Date;
-    expiresAt: Date;
-  }>;
-  createdAt: Date;
-  updatedAt: Date;
+```prisma
+model User {
+  id                       String    @id @default(cuid())
+  username                 String    @unique
+  displayName              String    @default("")
+  email                    String    @unique
+  passwordHash             String
+  avatarUrl                String    @default("")
+  avatarPublicId           String    @default("")
+  bio                      String    @default("")
+  status                   String    @default("offline")
+  lastSeen                 DateTime  @default(now())
+  role                     String    @default("user")
+  accountStatus            String    @default("active")
+  privacySettings          Json      @default("...")
+  notificationSettings     Json      @default("...")
+  isEmailVerified          Boolean   @default(false)
+  emailVerificationToken   String?
+  emailVerificationExpires DateTime?
+  lastVerificationSentAt   DateTime?
+  passwordResetToken       String?
+  passwordResetExpires     DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  refreshTokenHashes      RefreshToken[]
+  conversationMemberships ConversationMember[]
+  // ... relationships to messages, reactions, receipts, reports, audits
 }
 ```
 
-#### Mongoose Index Definitions
-- `{ username: 1 }` (Unique, Sparse)
-- `{ email: 1 }` (Unique)
-- `{ "refreshTokenHashes.hash": 1 }` (Multikey index for fast session validation)
+#### Key Indexes & Constraints
+- `username` (Unique)
+- `email` (Unique)
 
 ---
 
-### 2.2 Conversation Collection (`conversations`)
+### 2.2 Conversation Table (`Conversation`)
 
 Represents 1-on-1 Direct Messages (DMs) and multi-user Group Channels.
 
-```typescript
-interface IConversationMember {
-  userId: Types.ObjectId;
-  role: 'owner' | 'admin' | 'member';
-  joinedAt: Date;
-  lastReadAt: Date;
-}
+```prisma
+model Conversation {
+  id            String   @id @default(cuid())
+  type          String
+  name          String   @default("")
+  description   String   @default("")
+  isPrivate     Boolean  @default(true)
+  avatarUrl     String   @default("")
+  directKey     String?  @unique
+  lastMessageId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-interface IConversation {
-  _id: Types.ObjectId;
-  type: 'direct' | 'group' | 'channel';
-  name?: string;               // Required for group/channel
-  description?: string;        // Max 500 chars
-  isPrivate: boolean;
-  avatarUrl?: string;
-  members: IConversationMember[];
-  lastMessageId?: Types.ObjectId;
-  createdAt: Date;
-  updatedAt: Date;
+  members  ConversationMember[]
+  messages Message[]
+  reports  Report[]
+
+  @@index([type, isPrivate])
 }
 ```
 
-#### Mongoose Index Definitions
-- `{ "members.userId": 1, updatedAt: -1 }` (Compound index for fetching user's active conversations sorted by recency)
-- `{ type: 1, isPrivate: 1 }` (Index for discovering public channels)
+#### Key Indexes & Constraints
+- `directKey` (Unique) - Enforces 1-on-1 DM uniqueness.
+- `@@index([type, isPrivate])` - For discovering public channels.
 
 ---
 
-### 2.3 Message Collection (`messages`)
+### 2.3 ConversationMember Table (`ConversationMember`)
 
-Stores all chat content, media attachments, and read tracking data.
+Join table mapping users to conversations with role and read-state tracking.
 
-```typescript
-interface IAttachment {
-  url: string;
-  publicId: string;
-  type: 'image' | 'document';
-  filename: string;
-  size: number; // In bytes (<5MB)
-}
+```prisma
+model ConversationMember {
+  id              String   @id @default(cuid())
+  userId          String
+  conversationId  String
+  role            String   @default("member")
+  joinedAt        DateTime @default(now())
+  lastReadAt      DateTime @default(now())
+  lastDeliveredAt DateTime @default(now())
 
-interface IMessage {
-  _id: Types.ObjectId;
-  conversationId: Types.ObjectId; // References conversations._id
-  senderId: Types.ObjectId;       // References users._id
-  content?: string;               // Max 2000 chars
-  attachments: IAttachment[];
-  reactions: Array<{
-    emoji: string;
-    userId: Types.ObjectId;
-  }>;
-  readBy: Array<{
-    userId: Types.ObjectId;
-    readAt: Date;
-  }>;
-  isEdited: boolean;
-  isDeleted: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  user         User         @relation(...)
+  conversation Conversation @relation(...)
+
+  @@unique([userId, conversationId])
+  @@index([userId, conversationId])
 }
 ```
-
-#### Mongoose Index Definitions
-- `{ conversationId: 1, createdAt: -1 }` (Crucial compound index for reverse chronological message pagination)
-- `{ content: "text" }` (Text index reserved for basic message search)
 
 ---
 
-### 2.4 Report Collection (`reports`)
+### 2.4 Message Table (`Message`)
 
-Stores abuse and content violation reports submitted by users for administrative moderation.
+Stores all chat content, thread hierarchy (replies/forwards), and core message states.
 
-```typescript
-interface IReport {
-  _id: Types.ObjectId;
-  reporterId: Types.ObjectId;
-  targetType: 'user' | 'message' | 'conversation';
-  targetId: Types.ObjectId;
-  reason: string;
-  status: 'pending' | 'resolved' | 'dismissed';
-  notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
+```prisma
+model Message {
+  id              String    @id @default(cuid())
+  conversationId  String
+  senderId        String
+  content         String    @default("")
+  idempotencyKey  String?   @unique
+  replyToId       String?
+  forwardedFromId String?
+  isEdited        Boolean   @default(false)
+  isDeleted       Boolean   @default(false)
+  isPinned        Boolean   @default(false)
+  pinnedAt        DateTime?
+  pinnedById      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  conversation Conversation @relation(...)
+  sender       User         @relation(...)
+  attachments  Attachment[]
+  reactions    Reaction[]
+  readBy       ReadReceipt[]
+  audit        MessageAudit?
+  // ... self-relations for replies/forwards
 }
 ```
 
-#### Mongoose Index Definitions
-- `{ status: 1, createdAt: -1 }` (Index for administrative review queue sorting)
-- `{ reporterId: 1 }` (Index to enforce user report rate limits)
+#### Key Indexes & Constraints
+- `@@index([conversationId, createdAt(sort: Desc)])` (Crucial for reverse chronological pagination)
+- `@@index([senderId, createdAt(sort: Desc)])`
+- `idempotencyKey` (Unique) - Prevents duplicate network requests.
+
+---
+
+### 2.5 Attachment Table (`Attachment`)
+
+Normalized media attachments linked to messages.
+
+```prisma
+model Attachment {
+  id        String @id @default(cuid())
+  messageId String
+  url       String
+  publicId  String @default("")
+  type      String
+  filename  String
+  size      Int
+  duration  Int?
+  width     Int?
+  height    Int?
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+```
+
+---
+
+### 2.6 Report Table (`Report`)
+
+Stores abuse and content violation reports submitted by users.
+
+```prisma
+model Report {
+  id                     String   @id @default(cuid())
+  reporterId             String
+  reportedUserId         String?
+  reportedMessageId      String?
+  reportedConversationId String?
+  reason                 String
+  description            String   @default("")
+  status                 String   @default("pending")
+  moderatorNotes         String   @default("")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  
+  // Relations to User, Message, Conversation
+}
+```
 
 ---
 
@@ -140,7 +193,8 @@ interface IReport {
 
 | Relationship | Type | Implementation Choice & Justification |
 | :--- | :--- | :--- |
-| **User <-> Conversations** | Many-to-Many | Embedded array of `IConversationMember` inside `conversations`. Preferred over join table to allow fast single-query conversation metadata hydration. |
-| **Conversation <-> Messages** | One-to-Many | Referenced via `conversationId` in `messages`. Unbounded collection pattern prevents document size limit breaches (MongoDB 16MB limit). |
-| **User <-> Refresh Tokens** | One-to-Many | Embedded array `refreshTokenHashes` inside `users` schema (capped at max 5 active sessions per user). |
-| **Message <-> Attachments** | One-to-Few | Embedded array of `IAttachment` sub-documents directly within `IMessage` (capped at max 4 attachments per message). |
+| **User <-> Conversations** | Many-to-Many | Explicit join table `ConversationMember` allowing metadata (role, lastReadAt). |
+| **Conversation <-> Messages** | One-to-Many | `conversationId` Foreign Key in `Message` table. Scalable for unlimited messages. |
+| **User <-> Refresh Tokens** | One-to-Many | `userId` Foreign Key in `RefreshToken` table. Isolated cleanup of old sessions. |
+| **Message <-> Attachments** | One-to-Many | `messageId` Foreign Key in `Attachment` table. Supports rich media properties. |
+| **Message <-> Message** | One-to-Many (Self) | `replyToId` and `forwardedFromId` Foreign Keys mapping to other messages for threading and forwarding. |

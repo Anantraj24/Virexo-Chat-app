@@ -1,6 +1,6 @@
 import { verifyAccessToken } from '../utils/token.js';
 import { UnauthorizedError, ForbiddenError } from '../utils/errors.js';
-import { User } from '../models/User.js';
+import prisma from '../config/prisma.js';
 
 export async function authenticate(req, res, next) {
   try {
@@ -16,7 +16,10 @@ export async function authenticate(req, res, next) {
       throw new UnauthorizedError('Access token is invalid or expired', 'TOKEN_EXPIRED');
     }
 
-    const user = await User.findById(decoded.userId);
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId }
+    });
+    
     if (!user) {
       throw new UnauthorizedError('User session no longer exists', 'USER_NOT_FOUND');
     }

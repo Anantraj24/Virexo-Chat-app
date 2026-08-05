@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { setupMongoMemory, teardownMongoMemory } from './testSetup.js';
+import { setupTestDB, teardownTestDB } from './testSetup.js';
 
 beforeAll(async () => {
-  await setupMongoMemory();
+  await setupTestDB();
 }, 60000);
 
 afterAll(async () => {
-  await teardownMongoMemory();
+  await teardownTestDB();
 });
 
 describe('Email Service Unit Tests', () => {

@@ -11,34 +11,12 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  if (!user || user.role !== 'admin') {
-    return <Navigate to="/" replace />;
-  }
-
-  const fetchData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      if (activeTab === 'users') {
-        const res = await adminApi.getUsers({ limit: 50 });
-        setData(res.data.users);
-      } else if (activeTab === 'reports') {
-        const res = await adminApi.getReports({ limit: 50 });
-        setData(res.data.reports);
-      } else if (activeTab === 'logs') {
-        const res = await adminApi.getAuditLogs({ limit: 50 });
-        setData(res.data.logs);
-      }
-    } catch (err) {
-      setError('Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchData();
-  }, [activeTab]);
+    if (user && user.role === 'admin') {
+      fetchData();
+    }
+  }, [activeTab, user]);
+
 
   const handleUserStatus = async (id, currentStatus) => {
     if (!window.confirm(`Are you sure you want to ${currentStatus === 'active' ? 'suspend' : 'restore'} this user?`)) return;
@@ -59,6 +37,11 @@ const AdminDashboard = () => {
       alert('Failed to update report status');
     }
   };
+
+  if (!user || user.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+
 
   return (
     <div className="min-h-screen bg-virexo-bg-dark text-white p-8">
@@ -107,7 +90,7 @@ const AdminDashboard = () => {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {data.map((u) => (
-                    <tr key={u._id} className="hover:bg-white/5 transition-colors">
+                    <tr key={u.id} className="hover:bg-white/5 transition-colors">
                       <td className="p-4 flex items-center gap-3">
                         <img src={u.avatarUrl} alt={u.username} className="w-8 h-8 rounded-full" />
                         <div>
@@ -126,9 +109,9 @@ const AdminDashboard = () => {
                         </span>
                       </td>
                       <td className="p-4 text-right">
-                        {u.role !== 'admin' && u._id !== user.id && (
+                        {u.role !== 'admin' && u.id !== user.id && (
                           <button
-                            onClick={() => handleUserStatus(u._id, u.accountStatus)}
+                            onClick={() => handleUserStatus(u.id, u.accountStatus)}
                             className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
                               u.accountStatus === 'active' ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
                             }`}
@@ -159,7 +142,7 @@ const AdminDashboard = () => {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {data.map((r) => (
-                    <tr key={r._id} className="hover:bg-white/5 transition-colors">
+                    <tr key={r.id} className="hover:bg-white/5 transition-colors">
                       <td className="p-4">@{r.reporter?.username || 'Unknown'}</td>
                       <td className="p-4 capitalize">{r.reason}</td>
                       <td className="p-4 text-sm text-virexo-text-muted">
@@ -179,7 +162,7 @@ const AdminDashboard = () => {
                       <td className="p-4 text-right flex gap-2 justify-end">
                         {r.status !== 'resolved' && (
                           <button
-                            onClick={() => handleReportStatus(r._id, 'resolved')}
+                            onClick={() => handleReportStatus(r.id, 'resolved')}
                             className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-500/20 text-green-400 hover:bg-green-500/30"
                           >
                             Resolve
@@ -187,7 +170,7 @@ const AdminDashboard = () => {
                         )}
                         {r.status !== 'dismissed' && (
                           <button
-                            onClick={() => handleReportStatus(r._id, 'dismissed')}
+                            onClick={() => handleReportStatus(r.id, 'dismissed')}
                             className="px-3 py-1.5 rounded-lg text-sm font-medium bg-white/10 text-gray-300 hover:bg-white/20"
                           >
                             Dismiss
@@ -215,7 +198,7 @@ const AdminDashboard = () => {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {data.map((l) => (
-                    <tr key={l._id} className="hover:bg-white/5 transition-colors">
+                    <tr key={l.id} className="hover:bg-white/5 transition-colors">
                       <td className="p-4 text-virexo-brand font-medium">@{l.admin?.username || 'Unknown'}</td>
                       <td className="p-4 font-mono text-sm">{l.action}</td>
                       <td className="p-4 text-sm text-virexo-text-muted">{l.targetType}: {l.targetId}</td>

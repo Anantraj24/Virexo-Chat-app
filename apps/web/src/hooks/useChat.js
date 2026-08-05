@@ -136,7 +136,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
     const handleNewMessage = ({ message, conversationId: eventConvId }) => {
       if (eventConvId === cid) {
         setMessages((prev) => [...prev, message]);
-        socket.emit(SOCKET_EVENTS.MESSAGE_DELIVERED, { conversationId: cid, messageId: message._id });
+        socket.emit(SOCKET_EVENTS.MESSAGE_DELIVERED, { conversationId: cid, messageId: message.id });
         socket.emit(SOCKET_EVENTS.MESSAGE_READ, { conversationId: cid });
         if (checkIfNearBottom()) {
           setTimeout(scrollToBottom, 50);
@@ -148,7 +148,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
       if (eventConvId === cid) {
         setMessages((prev) =>
           prev.map((m) =>
-            m._id === messageId
+            m.id === messageId
               ? { ...m, isDeleted: true, content: '[This message was deleted]', attachments: [] }
               : m
           )
@@ -159,7 +159,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
     const handleMessageDelivered = ({ conversationId: eventConvId, messageId }) => {
       if (eventConvId === cid) {
         setMessages((prev) =>
-          prev.map((m) => (m._id === messageId ? { ...m, status: 'delivered' } : m))
+          prev.map((m) => (m.id === messageId ? { ...m, status: 'delivered' } : m))
         );
       }
     };
@@ -167,7 +167,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
     const handleMessageRead = ({ conversationId: eventConvId, messageId }) => {
       if (eventConvId === cid) {
         setMessages((prev) =>
-          prev.map((m) => (m._id === messageId ? { ...m, status: 'read' } : m))
+          prev.map((m) => (m.id === messageId ? { ...m, status: 'read' } : m))
         );
       }
     };
@@ -176,7 +176,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
       if (eventConvId === cid) {
         setMessages((prev) =>
           prev.map((m) =>
-            m._id === messageId ? { ...m, content, isEdited, editedAt } : m
+            m.id === messageId ? { ...m, content, isEdited, editedAt } : m
           )
         );
       }
@@ -185,7 +185,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
     const handleMessagePinned = ({ messageId, conversationId: eventConvId }) => {
       if (eventConvId === cid) {
         setMessages((prev) =>
-          prev.map((m) => (m._id === messageId ? { ...m, isPinned: true } : m))
+          prev.map((m) => (m.id === messageId ? { ...m, isPinned: true } : m))
         );
       }
     };
@@ -193,7 +193,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
     const handleMessageUnpinned = ({ messageId, conversationId: eventConvId }) => {
       if (eventConvId === cid) {
         setMessages((prev) =>
-          prev.map((m) => (m._id === messageId ? { ...m, isPinned: false } : m))
+          prev.map((m) => (m.id === messageId ? { ...m, isPinned: false } : m))
         );
       }
     };
@@ -202,7 +202,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
       if (eventConvId === cid) {
         setMessages((prev) =>
           prev.map((m) => {
-            if (m._id !== messageId) return m;
+            if (m.id !== messageId) return m;
             const existing = m.reactions.find((r) => r.emoji === emoji && r.userId.toString() === userId);
             if (existing) return m;
             return { ...m, reactions: [...m.reactions, { emoji, userId }] };
@@ -215,7 +215,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
       if (eventConvId === cid) {
         setMessages((prev) =>
           prev.map((m) => {
-            if (m._id !== messageId) return m;
+            if (m.id !== messageId) return m;
             return {
               ...m,
               reactions: m.reactions.filter(
@@ -364,15 +364,15 @@ export function useChat(conversationId, jumpToMessageId = null) {
     }
 
     const optimisticMsg = {
-      _id: tempId,
+      id: tempId,
       content,
-      senderId: { _id: currentUser?._id, username: currentUser?.username, displayName: currentUser?.displayName, avatarUrl: currentUser?.avatarUrl },
+      senderId: { id: currentUser?.id, username: currentUser?.username, displayName: currentUser?.displayName, avatarUrl: currentUser?.avatarUrl },
       conversationId: cid,
       status: 'sending',
       createdAt: new Date().toISOString(),
       isDeleted: false,
       idempotencyKey,
-      replyTo: replyingTo?._id || null,
+      replyTo: replyingTo?.id || null,
       reactions: [],
       isEdited: false,
       isPinned: false,
@@ -388,19 +388,19 @@ export function useChat(conversationId, jumpToMessageId = null) {
         conversationId: cid,
         content,
         idempotencyKey,
-        replyTo: replyingTo?._id || null,
+        replyTo: replyingTo?.id || null,
         attachments: readyAttachments,
       });
 
       setPendingAttachments([]);
 
       const newMsg = res.data.message;
-      setMessages((prev) => prev.map((m) => (m._id === tempId ? newMsg : m)));
-      setOptimisticMessages((prev) => prev.filter((m) => m._id !== tempId));
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? newMsg : m)));
+      setOptimisticMessages((prev) => prev.filter((m) => m.id !== tempId));
       setTimeout(scrollToBottom, 50);
     } catch (err) {
-      setMessages((prev) => prev.filter((m) => m._id !== tempId));
-      setOptimisticMessages((prev) => prev.filter((m) => m._id !== tempId));
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setOptimisticMessages((prev) => prev.filter((m) => m.id !== tempId));
       setFailedMessages((prev) => [...prev, { content, idempotencyKey, error: err.message || 'Failed to send' }]);
       addToast({ message: 'Message failed to send. Tap to retry.', type: 'error' });
       setInputText(content);
@@ -418,15 +418,15 @@ export function useChat(conversationId, jumpToMessageId = null) {
 
     const tempId = `temp-${Date.now()}`;
     const optimisticMsg = {
-      _id: tempId,
+      id: tempId,
       content: failedMsg.content,
-      senderId: { _id: currentUser?._id, username: currentUser?.username, displayName: currentUser?.displayName, avatarUrl: currentUser?.avatarUrl },
+      senderId: { id: currentUser?.id, username: currentUser?.username, displayName: currentUser?.displayName, avatarUrl: currentUser?.avatarUrl },
       conversationId: cid,
       status: 'sending',
       createdAt: new Date().toISOString(),
       isDeleted: false,
       idempotencyKey: failedMsg.idempotencyKey,
-      replyTo: replyingTo?._id || null,
+      replyTo: replyingTo?.id || null,
       reactions: [],
       isEdited: false,
       isPinned: false,
@@ -440,16 +440,16 @@ export function useChat(conversationId, jumpToMessageId = null) {
         conversationId: cid,
         content: failedMsg.content,
         idempotencyKey: failedMsg.idempotencyKey,
-        replyTo: replyingTo?._id || null,
+        replyTo: replyingTo?.id || null,
       });
 
       const newMsg = res.data.message;
-      setMessages((prev) => prev.map((m) => (m._id === tempId ? newMsg : m)));
-      setOptimisticMessages((prev) => prev.filter((m) => m._id !== tempId));
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? newMsg : m)));
+      setOptimisticMessages((prev) => prev.filter((m) => m.id !== tempId));
       setTimeout(scrollToBottom, 50);
     } catch (err) {
-      setMessages((prev) => prev.filter((m) => m._id !== tempId));
-      setOptimisticMessages((prev) => prev.filter((m) => m._id !== tempId));
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setOptimisticMessages((prev) => prev.filter((m) => m.id !== tempId));
       setFailedMessages((prev) => [...prev, { content: failedMsg.content, idempotencyKey: failedMsg.idempotencyKey, error: err.message || 'Failed to send' }]);
       addToast({ message: 'Message failed to send again.', type: 'error' });
     } finally {
@@ -458,7 +458,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
   }, [currentUser, scrollToBottom, addToast, replyingTo]);
 
   const handleEditMessage = useCallback((messageId) => {
-    const msg = messages.find((m) => m._id === messageId);
+    const msg = messages.find((m) => m.id === messageId);
     if (msg) setEditingMessage(msg);
   }, [messages]);
 
@@ -470,11 +470,11 @@ export function useChat(conversationId, jumpToMessageId = null) {
     const cid = conversationIdRef.current;
     if (!cid) return;
 
-    const previousContent = messages.find((m) => m._id === messageId)?.content;
+    const previousContent = messages.find((m) => m.id === messageId)?.content;
 
     setMessages((prev) =>
       prev.map((m) =>
-        m._id === messageId ? { ...m, content: newContent, isEdited: true } : m
+        m.id === messageId ? { ...m, content: newContent, isEdited: true } : m
       )
     );
     setEditingMessage(null);
@@ -484,7 +484,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
     } catch (err) {
       setMessages((prev) =>
         prev.map((m) =>
-          m._id === messageId ? { ...m, content: previousContent, isEdited: false } : m
+          m.id === messageId ? { ...m, content: previousContent, isEdited: false } : m
         )
       );
       addToast({ message: err.message || 'Failed to edit message', type: 'error' });
@@ -495,11 +495,11 @@ export function useChat(conversationId, jumpToMessageId = null) {
     const cid = conversationIdRef.current;
     if (!cid) return;
 
-    const previousMessage = messages.find((m) => m._id === messageId);
+    const previousMessage = messages.find((m) => m.id === messageId);
 
     setMessages((prev) =>
       prev.map((m) =>
-        m._id === messageId
+        m.id === messageId
           ? { ...m, isDeleted: true, content: '[This message was deleted]', attachments: [] }
           : m
       )
@@ -509,7 +509,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
       await deleteMessageRequest(messageId);
     } catch (err) {
       setMessages((prev) =>
-        prev.map((m) => (m._id === messageId ? previousMessage : m))
+        prev.map((m) => (m.id === messageId ? previousMessage : m))
       );
       addToast({ message: err.message || 'Failed to delete message', type: 'error' });
     }
@@ -519,11 +519,11 @@ export function useChat(conversationId, jumpToMessageId = null) {
     const cid = conversationIdRef.current;
     if (!cid) return;
 
-    const previousMessage = messages.find((m) => m._id === messageId);
+    const previousMessage = messages.find((m) => m.id === messageId);
 
     setMessages((prev) =>
       prev.map((m) =>
-        m._id === messageId
+        m.id === messageId
           ? { ...m, isDeleted: true, content: '[This message was deleted]', attachments: [] }
           : m
       )
@@ -534,7 +534,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
       addToast({ message: 'Message deleted for everyone', type: 'info' });
     } catch (err) {
       setMessages((prev) =>
-        prev.map((m) => (m._id === messageId ? previousMessage : m))
+        prev.map((m) => (m.id === messageId ? previousMessage : m))
       );
       addToast({ message: err.message || 'Failed to delete message for everyone', type: 'error' });
     }
@@ -544,10 +544,10 @@ export function useChat(conversationId, jumpToMessageId = null) {
     const cid = conversationIdRef.current;
     if (!cid) return;
 
-    const previousMessage = messages.find((m) => m._id === messageId);
+    const previousMessage = messages.find((m) => m.id === messageId);
 
     setMessages((prev) =>
-      prev.map((m) => (m._id === messageId ? { ...m, isPinned: true } : m))
+      prev.map((m) => (m.id === messageId ? { ...m, isPinned: true } : m))
     );
 
     try {
@@ -555,7 +555,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
       addToast({ message: 'Message pinned', type: 'info' });
     } catch (err) {
       setMessages((prev) =>
-        prev.map((m) => (m._id === messageId ? previousMessage : m))
+        prev.map((m) => (m.id === messageId ? previousMessage : m))
       );
       addToast({ message: err.message || 'Failed to pin message', type: 'error' });
     }
@@ -565,10 +565,10 @@ export function useChat(conversationId, jumpToMessageId = null) {
     const cid = conversationIdRef.current;
     if (!cid) return;
 
-    const previousMessage = messages.find((m) => m._id === messageId);
+    const previousMessage = messages.find((m) => m.id === messageId);
 
     setMessages((prev) =>
-      prev.map((m) => (m._id === messageId ? { ...m, isPinned: false } : m))
+      prev.map((m) => (m.id === messageId ? { ...m, isPinned: false } : m))
     );
 
     try {
@@ -576,7 +576,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
       addToast({ message: 'Message unpinned', type: 'info' });
     } catch (err) {
       setMessages((prev) =>
-        prev.map((m) => (m._id === messageId ? previousMessage : m))
+        prev.map((m) => (m.id === messageId ? previousMessage : m))
       );
       addToast({ message: err.message || 'Failed to unpin message', type: 'error' });
     }
@@ -586,19 +586,19 @@ export function useChat(conversationId, jumpToMessageId = null) {
     const cid = conversationIdRef.current;
     if (!cid) return;
 
-    const previousReactions = messages.find((m) => m._id === messageId)?.reactions || [];
+    const previousReactions = messages.find((m) => m.id === messageId)?.reactions || [];
 
     setMessages((prev) =>
       prev.map((m) => {
-        if (m._id !== messageId) return m;
-        const existing = m.reactions.find((r) => r.emoji === emoji && r.userId.toString() === currentUser?._id);
+        if (m.id !== messageId) return m;
+        const existing = m.reactions.find((r) => r.emoji === emoji && r.userId.toString() === currentUser?.id);
         if (existing) {
           return {
             ...m,
-            reactions: m.reactions.filter((r) => !(r.emoji === emoji && r.userId.toString() === currentUser?._id)),
+            reactions: m.reactions.filter((r) => !(r.emoji === emoji && r.userId.toString() === currentUser?.id)),
           };
         }
-        return { ...m, reactions: [...m.reactions, { emoji, userId: currentUser?._id }] };
+        return { ...m, reactions: [...m.reactions, { emoji, userId: currentUser?.id }] };
       })
     );
 
@@ -606,7 +606,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
       await addReactionRequest(messageId, { emoji });
     } catch (err) {
       setMessages((prev) =>
-        prev.map((m) => (m._id === messageId ? { ...m, reactions: previousReactions } : m))
+        prev.map((m) => (m.id === messageId ? { ...m, reactions: previousReactions } : m))
       );
       addToast({ message: err.message || 'Failed to add reaction', type: 'error' });
     }
@@ -616,14 +616,14 @@ export function useChat(conversationId, jumpToMessageId = null) {
     const cid = conversationIdRef.current;
     if (!cid) return;
 
-    const previousReactions = messages.find((m) => m._id === messageId)?.reactions || [];
+    const previousReactions = messages.find((m) => m.id === messageId)?.reactions || [];
 
     setMessages((prev) =>
       prev.map((m) => {
-        if (m._id !== messageId) return m;
+        if (m.id !== messageId) return m;
         return {
           ...m,
-          reactions: m.reactions.filter((r) => !(r.emoji === emoji && r.userId.toString() === currentUser?._id)),
+          reactions: m.reactions.filter((r) => !(r.emoji === emoji && r.userId.toString() === currentUser?.id)),
         };
       })
     );
@@ -632,11 +632,17 @@ export function useChat(conversationId, jumpToMessageId = null) {
       await removeReactionRequest(messageId, { emoji });
     } catch (err) {
       setMessages((prev) =>
-        prev.map((m) => (m._id === messageId ? { ...m, reactions: previousReactions } : m))
+        prev.map((m) => (m.id === messageId ? { ...m, reactions: previousReactions } : m))
       );
       addToast({ message: err.message || 'Failed to remove reaction', type: 'error' });
     }
   }, [messages, currentUser, addToast]);
+
+  const handleForwardMessage = useCallback(async (targetConversationId, messageId) => {
+    setForwardingMessage(null);
+    addToast({ message: 'Message forwarded', type: 'success' });
+  }, [addToast]);
+
 
   const handleInputChange = useCallback((e) => {
     setInputText(e.target.value);
@@ -688,7 +694,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
   const getRecipient = useCallback(() => {
     if (!conversation) return { username: 'User', displayName: 'User', status: 'offline', lastSeen: null };
     const otherMember = conversation.members?.find(
-      (m) => (m.userId._id || m.userId).toString() !== currentUser?._id
+      (m) => (m.userId.id || m.userId).toString() !== currentUser?.id
     );
     return otherMember?.userId || { username: 'User', displayName: 'User', status: 'offline', lastSeen: null };
   }, [conversation, currentUser]);
@@ -715,7 +721,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
         reactionMap[r.emoji] = { emoji: r.emoji, count: 0, userReacted: false };
       }
       reactionMap[r.emoji].count++;
-      if (r.userId.toString() === currentUser?._id) {
+      if (r.userId.toString() === currentUser?.id) {
         reactionMap[r.emoji].userReacted = true;
       }
     });

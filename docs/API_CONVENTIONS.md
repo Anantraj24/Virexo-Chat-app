@@ -118,16 +118,17 @@ const socket = io(API_URL, {
 
 ## 4. Message Pagination Strategy
 
-Virexo uses **Cursor-Based Pagination** anchored to the `_id` or `createdAt` timestamp of messages.
+Virexo uses **Cursor-Based Pagination** anchored to the `id` of messages (cuid string format).
 
-- **Request**: `GET /api/v1/conversations/123/messages?before=64f8a9b2c3d4e5f6a7b8c9d0&limit=30`
-- **Database Query**:
+- **Request**: `GET /api/v1/conversations/123/messages?before=clkq7j8k90000y8q9c4i6v0j1&limit=30`
+- **Database Query (Prisma)**:
   ```javascript
-  Message.find({
-    conversationId,
-    _id: { $lt: beforeId }
-  })
-  .sort({ _id: -1 })
-  .limit(limit);
+  prisma.message.findMany({
+    where: { conversationId },
+    take: limit,
+    skip: beforeId ? 1 : 0,
+    cursor: beforeId ? { id: beforeId } : undefined,
+    orderBy: { createdAt: 'desc' }
+  });
   ```
 - **Rationale**: Prevents missing or duplicate messages when new real-time messages are inserted into the conversation while the user scrolls historical logs.

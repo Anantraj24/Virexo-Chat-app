@@ -1,21 +1,30 @@
-import { User } from '../models/User.js';
+import prisma from '../config/prisma.js';
 import { BadRequestError, NotFoundError } from '../utils/errors.js';
 import { createApiResponse } from '@virexo/shared';
 
 // Helper function to sanitize a public user object according to privacy settings
 function formatPublicProfile(user) {
-  const obj = user.toJSON();
+  // Prisma returns plain JS objects, not mongoose documents, so no need to call .toJSON()
+  const obj = { ...user };
 
   // Strip sensitive fields
+  delete obj.passwordHash;
+  delete obj.emailVerificationToken;
+  delete obj.emailVerificationExpires;
+  delete obj.lastVerificationSentAt;
+  delete obj.passwordResetToken;
+  delete obj.passwordResetExpires;
   delete obj.email;
   delete obj.privacySettings;
   delete obj.notificationSettings;
 
-  // Apply privacy settings
-  if (user.privacySettings && !user.privacySettings.showOnlineStatus) {
+  // Apply privacy settings (Assuming privacySettings is parsed as a JSON object)
+  const privacySettings = typeof user.privacySettings === 'string' ? JSON.parse(user.privacySettings) : user.privacySettings;
+  
+  if (privacySettings && !privacySettings.showOnlineStatus) {
     obj.status = 'offline';
   }
-  if (user.privacySettings && !user.privacySettings.showLastSeen) {
+  if (privacySettings && !privacySettings.showLastSeen) {
     delete obj.lastSeen;
   }
 
@@ -25,11 +34,18 @@ function formatPublicProfile(user) {
 // GET /api/v1/users/profile — Get Current User Profile
 export async function getProfile(req, res, next) {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await prisma.user.findUnique({ where: { id: req.user.id || req.user.id } });
     if (!user) {
       throw new NotFoundError('User profile not found', 'USER_NOT_FOUND');
     }
-    res.status(200).json(createApiResponse(true, { user: user.toJSON() }));
+    
+    // Strip sensitive fields
+    const safeUser = { ...user };
+    delete safeUser.passwordHash;
+    delete safeUser.emailVerificationToken;
+    delete safeUser.passwordResetToken;
+    
+    res.status(200).json(createApiResponse(true, { user: safeUser }));
   } catch (error) {
     next(error);
   }
@@ -39,30 +55,42 @@ export async function getProfile(req, res, next) {
 export async function updateProfile(req, res, next) {
   try {
     const { username, displayName, bio, avatarUrl } = req.body;
-    const user = await User.findById(req.user._id);
+    const userId = req.user.id || req.user.id;
+    
+    const user = await prisma.user.findUnique({ where: { id: userId } });
 
     if (!user) {
       throw new NotFoundError('User profile not found', 'USER_NOT_FOUND');
     }
 
+    const dataToUpdate = {};
+
     // Check unique username if username is changing
     if (username && username.toLowerCase() !== user.username) {
-      const existingUser = await User.findOne({ username: username.toLowerCase() });
+      const existingUser = await prisma.user.findUnique({ where: { username: username.toLowerCase() } });
       if (existingUser) {
         throw new BadRequestError('This username is already taken', 'USERNAME_TAKEN');
       }
-      user.username = username.toLowerCase();
+      dataToUpdate.username = username.toLowerCase();
     }
 
-    if (displayName !== undefined) user.displayName = displayName;
-    if (bio !== undefined) user.bio = bio;
-    if (avatarUrl !== undefined) user.avatarUrl = avatarUrl;
+    if (displayName !== undefined) dataToUpdate.displayName = displayName;
+    if (bio !== undefined) dataToUpdate.bio = bio;
+    if (avatarUrl !== undefined) dataToUpdate.avatarUrl = avatarUrl;
 
-    await user.save();
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: dataToUpdate
+    });
+
+    const safeUser = { ...updatedUser };
+    delete safeUser.passwordHash;
+    delete safeUser.emailVerificationToken;
+    delete safeUser.passwordResetToken;
 
     res.status(200).json(
       createApiResponse(true, {
-        user: user.toJSON(),
+        user: safeUser,
         message: 'Profile updated successfully',
       })
     );
@@ -75,21 +103,28 @@ export async function updateProfile(req, res, next) {
 export async function updatePrivacy(req, res, next) {
   try {
     const { showOnlineStatus, showLastSeen, allowDirectMessages } = req.body;
-    const user = await User.findById(req.user._id);
+    const userId = req.user.id || req.user.id;
+    
+    const user = await prisma.user.findUnique({ where: { id: userId } });
 
     if (!user) {
       throw new NotFoundError('User profile not found', 'USER_NOT_FOUND');
     }
 
-    if (showOnlineStatus !== undefined) user.privacySettings.showOnlineStatus = showOnlineStatus;
-    if (showLastSeen !== undefined) user.privacySettings.showLastSeen = showLastSeen;
-    if (allowDirectMessages !== undefined) user.privacySettings.allowDirectMessages = allowDirectMessages;
+    const privacySettings = typeof user.privacySettings === 'string' ? JSON.parse(user.privacySettings) : user.privacySettings || {};
 
-    await user.save();
+    if (showOnlineStatus !== undefined) privacySettings.showOnlineStatus = showOnlineStatus;
+    if (showLastSeen !== undefined) privacySettings.showLastSeen = showLastSeen;
+    if (allowDirectMessages !== undefined) privacySettings.allowDirectMessages = allowDirectMessages;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { privacySettings }
+    });
 
     res.status(200).json(
       createApiResponse(true, {
-        privacySettings: user.privacySettings,
+        privacySettings: updatedUser.privacySettings,
         message: 'Privacy settings updated successfully',
       })
     );
@@ -102,22 +137,29 @@ export async function updatePrivacy(req, res, next) {
 export async function updateNotifications(req, res, next) {
   try {
     const { emailNotifications, desktopNotifications, soundEnabled, notifyOnMention } = req.body;
-    const user = await User.findById(req.user._id);
+    const userId = req.user.id || req.user.id;
+    
+    const user = await prisma.user.findUnique({ where: { id: userId } });
 
     if (!user) {
       throw new NotFoundError('User profile not found', 'USER_NOT_FOUND');
     }
 
-    if (emailNotifications !== undefined) user.notificationSettings.emailNotifications = emailNotifications;
-    if (desktopNotifications !== undefined) user.notificationSettings.desktopNotifications = desktopNotifications;
-    if (soundEnabled !== undefined) user.notificationSettings.soundEnabled = soundEnabled;
-    if (notifyOnMention !== undefined) user.notificationSettings.notifyOnMention = notifyOnMention;
+    const notificationSettings = typeof user.notificationSettings === 'string' ? JSON.parse(user.notificationSettings) : user.notificationSettings || {};
 
-    await user.save();
+    if (emailNotifications !== undefined) notificationSettings.emailNotifications = emailNotifications;
+    if (desktopNotifications !== undefined) notificationSettings.desktopNotifications = desktopNotifications;
+    if (soundEnabled !== undefined) notificationSettings.soundEnabled = soundEnabled;
+    if (notifyOnMention !== undefined) notificationSettings.notifyOnMention = notifyOnMention;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { notificationSettings }
+    });
 
     res.status(200).json(
       createApiResponse(true, {
-        notificationSettings: user.notificationSettings,
+        notificationSettings: updatedUser.notificationSettings,
         message: 'Notification settings updated successfully',
       })
     );
@@ -139,7 +181,7 @@ export async function checkUsername(req, res, next) {
       );
     }
 
-    const existingUser = await User.findOne({ username: targetUsername });
+    const existingUser = await prisma.user.findUnique({ where: { username: targetUsername } });
     const isAvailable = !existingUser;
 
     res.status(200).json(
@@ -154,13 +196,16 @@ export async function checkUsername(req, res, next) {
 export async function searchUsers(req, res, next) {
   try {
     const { q } = req.query;
-    const searchRegex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-
-    const users = await User.find({
-      $or: [{ username: searchRegex }, { displayName: searchRegex }],
-    })
-      .limit(20)
-      .exec();
+    
+    const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          { username: { contains: q, mode: 'insensitive' } },
+          { displayName: { contains: q, mode: 'insensitive' } }
+        ]
+      },
+      take: 20
+    });
 
     const sanitizedUsers = users.map((u) => formatPublicProfile(u));
 
@@ -178,11 +223,12 @@ export async function getUserById(req, res, next) {
     const { id } = req.params;
     let user;
 
-    // Check if valid ObjectId, else search by username
-    if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      user = await User.findById(id);
-    } else {
-      user = await User.findOne({ username: id.toLowerCase() });
+    // Check if it looks like a cuid/uuid, else search by username
+    // For simplicity, we just try to find by ID first, then fallback to username
+    user = await prisma.user.findUnique({ where: { id } });
+    
+    if (!user) {
+      user = await prisma.user.findUnique({ where: { username: id.toLowerCase() } });
     }
 
     if (!user) {

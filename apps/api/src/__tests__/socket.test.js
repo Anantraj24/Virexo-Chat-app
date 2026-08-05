@@ -1,23 +1,19 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import http from 'http';
 import { io as ClientIO } from 'socket.io-client';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import app from '../app.js';
+import { setupTestDB, teardownTestDB, cleanCollections, prisma } from './testSetup.js';
 import { initSocketServer } from '../socket/socketServer.js';
-import { User } from '../models/User.js';
-import { Conversation } from '../models/Conversation.js';
 import { generateAccessToken } from '../utils/token.js';
 import { SOCKET_EVENTS } from '@virexo/shared';
 
-let mongoServer;
+
 let httpServer;
 let port;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const uri = mongoServer.getUri();
-  await mongoose.connect(uri);
+  await setupTestDB();
+    await cleanCollections();
 
   httpServer = http.createServer(app);
   initSocketServer(httpServer);
@@ -41,18 +37,17 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await User.deleteMany({});
-  await Conversation.deleteMany({});
+  await cleanCollections();
 });
 
 describe('Socket.IO Real-Time Foundation Integration Tests', () => {
   async function createTestUser(username, email) {
-    const user = await User.create({
+    const user = await prisma.user.create({ data: {
       username,
       email,
       passwordHash: 'hashed_password',
       status: 'offline',
-    });
+    } });
     const token = generateAccessToken(user);
     return { user, token };
   }
@@ -97,11 +92,11 @@ describe('Socket.IO Real-Time Foundation Integration Tests', () => {
     const user1 = await createTestUser('member_u1', 'm1@example.com');
     const user2 = await createTestUser('nonmember_u2', 'm2@example.com');
 
-    const conversation = await Conversation.create({
+    const conversation = await prisma.conversation.create({ data: {
       type: 'group',
       name: 'Secret Group',
-      members: [{ userId: user1.user._id, role: 'owner' }],
-    });
+      members: { create: [{ userId: user1.user.id, role: 'owner' }] },
+    } });
 
     const client1 = createSocketClient(user1.token);
     await new Promise((resolve) => client1.on('connect', resolve));
@@ -111,13 +106,13 @@ describe('Socket.IO Real-Time Foundation Integration Tests', () => {
 
     // User1 (member) joins -> success
     const ack1 = await new Promise((resolve) => {
-      client1.emit(SOCKET_EVENTS.JOIN_CONVERSATION, { conversationId: conversation._id.toString() }, resolve);
+      client1.emit(SOCKET_EVENTS.JOIN_CONVERSATION, { conversationId: conversation.id.toString() }, resolve);
     });
     expect(ack1.success).toBe(true);
 
     // User2 (non-member) joins -> failure
     const ack2 = await new Promise((resolve) => {
-      client2.emit(SOCKET_EVENTS.JOIN_CONVERSATION, { conversationId: conversation._id.toString() }, resolve);
+      client2.emit(SOCKET_EVENTS.JOIN_CONVERSATION, { conversationId: conversation.id.toString() }, resolve);
     });
     expect(ack2.success).toBe(false);
     expect(ack2.error).toBe('Not a member of conversation');
@@ -130,16 +125,16 @@ describe('Socket.IO Real-Time Foundation Integration Tests', () => {
     const user1 = await createTestUser('typer_1', 't1@example.com');
     const user2 = await createTestUser('watcher_2', 't2@example.com');
 
-    const conversation = await Conversation.create({
+    const conversation = await prisma.conversation.create({ data: {
       type: 'group',
       name: 'Typing Group',
-      members: [
-        { userId: user1.user._id, role: 'owner' },
-        { userId: user2.user._id, role: 'member' },
-      ],
-    });
+      members: { create: [
+        { userId: user1.user.id, role: 'owner' },
+        { userId: user2.user.id, role: 'member' },
+      ] },
+    } });
 
-    const convId = conversation._id.toString();
+    const convId = conversation.id.toString();
     const client1 = createSocketClient(user1.token);
     const client2 = createSocketClient(user2.token);
 
@@ -174,16 +169,16 @@ describe('Socket.IO Real-Time Foundation Integration Tests', () => {
     const user1 = await createTestUser('msg_sender', 'msgsend@example.com');
     const user2 = await createTestUser('msg_listener', 'msglisten@example.com');
 
-    const conversation = await Conversation.create({
+    const conversation = await prisma.conversation.create({ data: {
       type: 'group',
       name: 'Broadcast Group',
-      members: [
-        { userId: user1.user._id, role: 'owner' },
-        { userId: user2.user._id, role: 'member' },
-      ],
-    });
+      members: { create: [
+        { userId: user1.user.id, role: 'owner' },
+        { userId: user2.user.id, role: 'member' },
+      ] },
+    } });
 
-    const convId = conversation._id.toString();
+    const convId = conversation.id.toString();
     const client1 = createSocketClient(user1.token);
     const client2 = createSocketClient(user2.token);
 
@@ -224,8 +219,7 @@ describe('Socket.IO Real-Time Foundation Integration Tests', () => {
   it('should reject socket connection from a suspended user', async () => {
     const user = await createTestUser('banned_user', 'banned@example.com');
     // Suspend the user after creating the token
-    user.user.accountStatus = 'suspended';
-    await user.user.save();
+    await prisma.user.update({ where: { id: user.user.id }, data: { accountStatus: 'suspended' } });
 
     const client = createSocketClient(user.token);
 

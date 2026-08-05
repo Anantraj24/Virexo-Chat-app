@@ -14,7 +14,7 @@ async function startServer() {
       try {
         await connectDB();
       } catch (dbErr) {
-        logger.warn(`[MongoDB] Initial connection attempt deferred: ${dbErr.message}`);
+        logger.warn(`[PostgreSQL] Initial connection attempt deferred: ${dbErr.message}`);
       }
     }
 

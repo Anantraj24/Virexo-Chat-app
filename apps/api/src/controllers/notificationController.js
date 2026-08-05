@@ -1,41 +1,52 @@
-import { Notification } from '../models/Notification.js';
+import prisma from '../config/prisma.js';
 import { createApiResponse, SOCKET_EVENTS } from '@virexo/shared';
 import { getIO } from '../socket/socketServer.js';
 
 export const getNotifications = async (req, res, next) => {
   try {
-  const { cursor, limit = 20 } = req.query;
-  const query = { recipient: req.user._id };
+    const { cursor, limit = 20 } = req.query;
+    const currentUserId = req.user.id || req.user.id;
+    
+    const where = { recipientId: currentUserId };
 
-  if (cursor) {
-    query.createdAt = { $lt: new Date(cursor) };
-  }
+    if (cursor) {
+      where.createdAt = { lt: new Date(cursor) };
+    }
 
-  const notifications = await Notification.find(query)
-    .sort({ createdAt: -1 })
-    .limit(parseInt(limit, 10))
-    .populate('actor', 'username displayName avatarUrl status lastSeen')
-    .lean();
+    const maxLimit = parseInt(limit, 10);
 
-  const nextCursor =
-    notifications.length > 0
-      ? notifications[notifications.length - 1].createdAt.toISOString()
-      : null;
+    const notifications = await prisma.notification.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: maxLimit,
+      include: {
+        actor: {
+          select: { id: true, username: true, displayName: true, avatarUrl: true, status: true, lastSeen: true }
+        }
+      }
+    });
 
-  const hasNextPage = notifications.length === parseInt(limit, 10);
+    const nextCursor =
+      notifications.length > 0
+        ? notifications[notifications.length - 1].createdAt.toISOString()
+        : null;
 
-  const unreadCount = await Notification.countDocuments({
-    recipient: req.user._id,
-    isRead: false,
-  });
+    const hasNextPage = notifications.length === maxLimit;
 
-  res.status(200).json(
-    createApiResponse(true, {
-      notifications,
-      unreadCount,
-      pagination: { nextCursor, hasNextPage },
-    })
-  );
+    const unreadCount = await prisma.notification.count({
+      where: {
+        recipientId: currentUserId,
+        isRead: false,
+      }
+    });
+
+    res.status(200).json(
+      createApiResponse(true, {
+        notifications,
+        unreadCount,
+        pagination: { nextCursor, hasNextPage },
+      })
+    );
   } catch (error) {
     next(error);
   }
@@ -43,12 +54,15 @@ export const getNotifications = async (req, res, next) => {
 
 export const getUnreadCount = async (req, res, next) => {
   try {
-  const unreadCount = await Notification.countDocuments({
-    recipient: req.user._id,
-    isRead: false,
-  });
+    const currentUserId = req.user.id || req.user.id;
+    const unreadCount = await prisma.notification.count({
+      where: {
+        recipientId: currentUserId,
+        isRead: false,
+      }
+    });
 
-  res.status(200).json(createApiResponse(true, { unreadCount }));
+    res.status(200).json(createApiResponse(true, { unreadCount }));
   } catch (error) {
     next(error);
   }
@@ -56,26 +70,31 @@ export const getUnreadCount = async (req, res, next) => {
 
 export const markAsRead = async (req, res, next) => {
   try {
-  const { id } = req.params;
+    const { id } = req.params;
+    const currentUserId = req.user.id || req.user.id;
 
-  const notification = await Notification.findOneAndUpdate(
-    { _id: id, recipient: req.user._id },
-    { isRead: true },
-    { new: true }
-  );
-
-  if (!notification) {
-    return res.status(404).json(createApiResponse(false, null, 'Notification not found'));
-  }
-
-  try {
-    const io = getIO();
-    io.to(`user:${req.user._id}`).emit(SOCKET_EVENTS.NOTIFICATION_READ, {
-      notificationId: notification._id,
+    // First check if it exists and belongs to the user
+    const existing = await prisma.notification.findUnique({
+      where: { id }
     });
-  } catch (err) {}
 
-  res.status(200).json(createApiResponse(true, { notification }));
+    if (!existing || existing.recipientId !== currentUserId) {
+      return res.status(404).json(createApiResponse(false, null, 'Notification not found'));
+    }
+
+    const notification = await prisma.notification.update({
+      where: { id },
+      data: { isRead: true }
+    });
+
+    try {
+      const io = getIO();
+      io.to(`user:${currentUserId}`).emit(SOCKET_EVENTS.NOTIFICATION_READ, {
+        notificationId: notification.id,
+      });
+    } catch (err) {}
+
+    res.status(200).json(createApiResponse(true, { notification }));
   } catch (error) {
     next(error);
   }
@@ -83,19 +102,21 @@ export const markAsRead = async (req, res, next) => {
 
 export const markAllAsRead = async (req, res, next) => {
   try {
-  await Notification.updateMany(
-    { recipient: req.user._id, isRead: false },
-    { isRead: true }
-  );
-
-  try {
-    const io = getIO();
-    io.to(`user:${req.user._id}`).emit(SOCKET_EVENTS.NOTIFICATION_READ, {
-      all: true,
+    const currentUserId = req.user.id || req.user.id;
+    
+    await prisma.notification.updateMany({
+      where: { recipientId: currentUserId, isRead: false },
+      data: { isRead: true }
     });
-  } catch (err) {}
 
-  res.status(200).json(createApiResponse(true, { message: 'All notifications marked as read' }));
+    try {
+      const io = getIO();
+      io.to(`user:${currentUserId}`).emit(SOCKET_EVENTS.NOTIFICATION_READ, {
+        all: true,
+      });
+    } catch (err) {}
+
+    res.status(200).json(createApiResponse(true, { message: 'All notifications marked as read' }));
   } catch (error) {
     next(error);
   }
@@ -110,15 +131,17 @@ export const triggerNotification = async ({
   entityModel,
   content,
 }) => {
-  if (recipientId.toString() === actorId.toString()) return; // Don't notify self
+  if (recipientId === actorId) return; // Don't notify self
 
   // Check for duplicate unread notification of the same type/entity/actor
-  const existing = await Notification.findOne({
-    recipient: recipientId,
-    actor: actorId,
-    type,
-    entityId,
-    isRead: false,
+  const existing = await prisma.notification.findFirst({
+    where: {
+      recipientId,
+      actorId,
+      type,
+      entityId,
+      isRead: false,
+    }
   });
 
   if (existing) {
@@ -126,27 +149,30 @@ export const triggerNotification = async ({
     return existing;
   }
 
-  const notification = await Notification.create({
-    recipient: recipientId,
-    actor: actorId,
-    type,
-    entityId,
-    entityModel,
-    content,
+  const notification = await prisma.notification.create({
+    data: {
+      recipientId,
+      actorId,
+      type,
+      entityId,
+      entityModel,
+      content,
+    },
+    include: {
+      actor: {
+        select: { id: true, username: true, displayName: true, avatarUrl: true, status: true, lastSeen: true }
+      }
+    }
   });
-
-  const populated = await Notification.findById(notification._id)
-    .populate('actor', 'username displayName avatarUrl status lastSeen')
-    .lean();
 
   try {
     const io = getIO();
     io.to(`user:${recipientId}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW, {
-      notification: populated,
+      notification,
     });
   } catch (error) {
     // Ignore in tests if socket server is not started
   }
 
-  return populated;
+  return notification;
 };

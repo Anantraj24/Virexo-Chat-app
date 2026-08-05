@@ -1,27 +1,18 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import app from '../app.js';
-import { User } from '../models/User.js';
-
-let mongoServer;
+import { setupTestDB, teardownTestDB, cleanCollections, prisma } from './testSetup.js';
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const uri = mongoServer.getUri();
-  await mongoose.connect(uri);
+  await setupTestDB();
 }, 60000);
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  if (mongoServer) {
-    await mongoServer.stop();
-  }
+  await teardownTestDB();
 });
 
 beforeEach(async () => {
-  await User.deleteMany({});
+  await cleanCollections();
 });
 
 describe('Authentication API Integration Tests', () => {
@@ -133,8 +124,9 @@ describe('Authentication API Integration Tests', () => {
     expect(reuseRes.body.error.code).toBe('TOKEN_REUSE_DETECTED');
 
     // Verify user sessions were completely cleared in DB
-    const dbUser = await User.findOne({ email: testUser.email });
-    expect(dbUser.refreshTokenHashes.length).toBe(0);
+    const dbUser = await prisma.user.findFirst({ where: { email: testUser.email } });
+    const tokenCount = await prisma.refreshToken.count({ where: { userId: dbUser.id } });
+    expect(tokenCount).toBe(0);
   });
 
   it('POST /api/v1/auth/logout should revoke active refresh session and clear cookie', async () => {
@@ -144,8 +136,9 @@ describe('Authentication API Integration Tests', () => {
     const logoutRes = await request(app).post('/api/v1/auth/logout').set('Cookie', cookie);
     expect(logoutRes.status).toBe(200);
 
-    const dbUser = await User.findOne({ email: testUser.email });
-    expect(dbUser.refreshTokenHashes.length).toBe(0);
+    const dbUser = await prisma.user.findFirst({ where: { email: testUser.email } });
+    const tokenCount = await prisma.refreshToken.count({ where: { userId: dbUser.id } });
+    expect(tokenCount).toBe(0);
   });
 
   it('POST /api/v1/auth/logout-all should revoke all active sessions for authenticated user', async () => {
@@ -158,8 +151,9 @@ describe('Authentication API Integration Tests', () => {
 
     expect(logoutAllRes.status).toBe(200);
 
-    const dbUser = await User.findOne({ email: testUser.email });
-    expect(dbUser.refreshTokenHashes.length).toBe(0);
+    const dbUser = await prisma.user.findFirst({ where: { email: testUser.email } });
+    const tokenCount = await prisma.refreshToken.count({ where: { userId: dbUser.id } });
+    expect(tokenCount).toBe(0);
   });
 
   it('Multiple sequential refreshes should produce new cookies each time', async () => {

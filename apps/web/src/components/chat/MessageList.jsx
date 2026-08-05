@@ -38,7 +38,7 @@ function shouldGroupWithPrevious(currentMsg, prevMsg) {
 
 function formatReplyPreview(message, allMessages) {
   if (!message.replyTo) return null;
-  const replyMessage = allMessages.find((m) => m._id === message.replyTo);
+  const replyMessage = allMessages.find((m) => m.id === message.replyTo);
   if (!replyMessage) return null;
   const sender = replyMessage.senderId || { username: 'Unknown', displayName: 'Unknown' };
   const content = replyMessage.isDeleted ? '[This message was deleted]' : (replyMessage.content || '[Attachment]');
@@ -116,7 +116,7 @@ const MessageItem = memo(({ message, isSelf, formatTime, currentUser, allMessage
 
   return (
     <div
-      id={`message-${message._id}`}
+      id={`message-${message.id}`}
       className={cn(
         'group flex items-start space-x-3 p-2 rounded-xl hover:bg-zinc-900/50 transition',
         isSelf && 'flex-row-reverse space-x-reverse'
@@ -187,13 +187,13 @@ const MessageItem = memo(({ message, isSelf, formatTime, currentUser, allMessage
           <MessageActionMenu
             message={message}
             currentUser={currentUser}
-            onEdit={() => onEdit?.(message._id)}
-            onDelete={() => onDelete?.(message._id)}
-            onDeleteForEveryone={() => onDeleteForEveryone?.(message._id)}
+            onEdit={() => onEdit?.(message.id)}
+            onDelete={() => onDelete?.(message.id)}
+            onDeleteForEveryone={() => onDeleteForEveryone?.(message.id)}
             onReply={() => onReply?.(message)}
-            onPin={() => onPin?.(message._id)}
-            onUnpin={() => onUnpin?.(message._id)}
-            onReaction={(emoji) => onReaction?.(message._id, emoji)}
+            onPin={() => onPin?.(message.id)}
+            onUnpin={() => onUnpin?.(message.id)}
+            onReaction={(emoji) => onReaction?.(message.id, emoji)}
             onForward={() => onForward?.(message)}
             onReport={() => onReport?.(message)}
           />
@@ -234,7 +234,7 @@ export function MessageList({
   useEffect(() => {
     if (messages.length > 0) {
       const latestMsg = messages[messages.length - 1];
-      const isSelf = latestMsg.senderId?._id === currentUser?._id;
+      const isSelf = latestMsg.senderId?.id === currentUser?.id;
       
       if (!isSelf && !latestMsg.isDeleted) {
         const senderName = latestMsg.senderId?.displayName || latestMsg.senderId?.username || 'someone';
@@ -323,12 +323,12 @@ export function MessageList({
           )}
 
           {messages.map((msg, index) => {
-            const isSelf = msg.senderId?._id === currentUser?._id;
+            const isSelf = msg.senderId?.id === currentUser?.id;
             const prevMsg = index > 0 ? messages[index - 1] : null;
             const showDateSep = shouldShowDateSeparator(msg, prevMsg);
 
             return (
-              <div key={msg._id}>
+              <div key={msg.id}>
                 {showDateSep && (
                   <DateSeparator date={formatDateSeparator(msg.createdAt)} />
                 )}
