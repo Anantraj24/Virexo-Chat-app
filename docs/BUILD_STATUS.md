@@ -1,7 +1,7 @@
 # Virexo Build Status & Progress Tracker
 
-- **Current Phase**: **Phase 20A - PostgreSQL Migration**
-- **Overall Status**: MongoDB has been fully replaced with PostgreSQL and Prisma ORM. Feature parity achieved.
+- **Current Phase**: **Phase 20B - Chat UI Error Fixes & Model Parity**
+- **Overall Status**: Unhandled UI errors caught during chatting fixed; Prisma sender/member relations normalized across frontend & backend.
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -181,3 +181,10 @@
 - [x] Frontend variables `_id` refactored to `id` across all React components and stores.
 - [x] Idempotency, rate limiting, and core logic rebuilt and tested for the relational data model.
 - [x] Resolved startup database connection failures and `ECONNREFUSED` issues.
+
+### Phase 20B: Chat UI Error Fixes & Model Parity
+- [x] Normalized `sender` object and `senderId` foreign key handling across fetched, WebSocket, and optimistic messages.
+- [x] Fixed `ConversationMember.user` vs `userId` string extraction for DMs, Group Settings, SearchModal, and ForwardMessageModal.
+- [x] Fixed safe reaction Array handling and `r.userId` string/object normalization in `useChat` hook to prevent React crashes.
+- [x] Updated Prisma `MessageAudit` updates to `upsert` in `messageController.js` to prevent database record missing errors on message edits and deletions.
+- [x] All 114 test suites across backend and frontend passing clean.

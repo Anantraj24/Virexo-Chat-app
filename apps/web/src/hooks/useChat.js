@@ -203,9 +203,13 @@ export function useChat(conversationId, jumpToMessageId = null) {
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id !== messageId) return m;
-            const existing = m.reactions.find((r) => r.emoji === emoji && r.userId.toString() === userId);
+            const currentReactions = m.reactions || [];
+            const existing = currentReactions.find((r) => {
+              const rUserId = typeof r.userId === 'object' ? r.userId?.id : r.userId;
+              return r.emoji === emoji && rUserId?.toString() === userId?.toString();
+            });
             if (existing) return m;
-            return { ...m, reactions: [...m.reactions, { emoji, userId }] };
+            return { ...m, reactions: [...currentReactions, { emoji, userId }] };
           })
         );
       }
@@ -218,9 +222,10 @@ export function useChat(conversationId, jumpToMessageId = null) {
             if (m.id !== messageId) return m;
             return {
               ...m,
-              reactions: m.reactions.filter(
-                (r) => !(r.emoji === emoji && r.userId.toString() === userId)
-              ),
+              reactions: (m.reactions || []).filter((r) => {
+                const rUserId = typeof r.userId === 'object' ? r.userId?.id : r.userId;
+                return !(r.emoji === emoji && rUserId?.toString() === userId?.toString());
+              }),
             };
           })
         );
@@ -366,7 +371,8 @@ export function useChat(conversationId, jumpToMessageId = null) {
     const optimisticMsg = {
       id: tempId,
       content,
-      senderId: { id: currentUser?.id, username: currentUser?.username, displayName: currentUser?.displayName, avatarUrl: currentUser?.avatarUrl },
+      senderId: currentUser?.id,
+      sender: { id: currentUser?.id, username: currentUser?.username, displayName: currentUser?.displayName, avatarUrl: currentUser?.avatarUrl },
       conversationId: cid,
       status: 'sending',
       createdAt: new Date().toISOString(),
@@ -420,7 +426,8 @@ export function useChat(conversationId, jumpToMessageId = null) {
     const optimisticMsg = {
       id: tempId,
       content: failedMsg.content,
-      senderId: { id: currentUser?.id, username: currentUser?.username, displayName: currentUser?.displayName, avatarUrl: currentUser?.avatarUrl },
+      senderId: currentUser?.id,
+      sender: { id: currentUser?.id, username: currentUser?.username, displayName: currentUser?.displayName, avatarUrl: currentUser?.avatarUrl },
       conversationId: cid,
       status: 'sending',
       createdAt: new Date().toISOString(),
@@ -591,14 +598,21 @@ export function useChat(conversationId, jumpToMessageId = null) {
     setMessages((prev) =>
       prev.map((m) => {
         if (m.id !== messageId) return m;
-        const existing = m.reactions.find((r) => r.emoji === emoji && r.userId.toString() === currentUser?.id);
+        const currentReactions = m.reactions || [];
+        const existing = currentReactions.find((r) => {
+          const rUserId = typeof r.userId === 'object' ? r.userId?.id : r.userId;
+          return r.emoji === emoji && rUserId?.toString() === currentUser?.id?.toString();
+        });
         if (existing) {
           return {
             ...m,
-            reactions: m.reactions.filter((r) => !(r.emoji === emoji && r.userId.toString() === currentUser?.id)),
+            reactions: currentReactions.filter((r) => {
+              const rUserId = typeof r.userId === 'object' ? r.userId?.id : r.userId;
+              return !(r.emoji === emoji && rUserId?.toString() === currentUser?.id?.toString());
+            }),
           };
         }
-        return { ...m, reactions: [...m.reactions, { emoji, userId: currentUser?.id }] };
+        return { ...m, reactions: [...currentReactions, { emoji, userId: currentUser?.id }] };
       })
     );
 
@@ -623,7 +637,10 @@ export function useChat(conversationId, jumpToMessageId = null) {
         if (m.id !== messageId) return m;
         return {
           ...m,
-          reactions: m.reactions.filter((r) => !(r.emoji === emoji && r.userId.toString() === currentUser?.id)),
+          reactions: (m.reactions || []).filter((r) => {
+            const rUserId = typeof r.userId === 'object' ? r.userId?.id : r.userId;
+            return !(r.emoji === emoji && rUserId?.toString() === currentUser?.id?.toString());
+          }),
         };
       })
     );
@@ -693,10 +710,15 @@ export function useChat(conversationId, jumpToMessageId = null) {
 
   const getRecipient = useCallback(() => {
     if (!conversation) return { username: 'User', displayName: 'User', status: 'offline', lastSeen: null };
-    const otherMember = conversation.members?.find(
-      (m) => (m.userId.id || m.userId).toString() !== currentUser?.id
+    const otherMember = conversation.members?.find((m) => {
+      const mUserId = m.user?.id || (typeof m.userId === 'object' ? m.userId?.id : m.userId);
+      return mUserId?.toString() !== currentUser?.id?.toString();
+    });
+    return (
+      otherMember?.user ||
+      (typeof otherMember?.userId === 'object' ? otherMember?.userId : null) ||
+      { username: 'User', displayName: 'User', status: 'offline', lastSeen: null }
     );
-    return otherMember?.userId || { username: 'User', displayName: 'User', status: 'offline', lastSeen: null };
   }, [conversation, currentUser]);
 
   const formatLastSeen = useCallback((lastSeen) => {
@@ -714,14 +736,16 @@ export function useChat(conversationId, jumpToMessageId = null) {
   }, []);
 
   const getMessageReactions = useCallback((message) => {
-    if (!message?.reactions) return [];
+    if (!message?.reactions || !Array.isArray(message.reactions)) return [];
     const reactionMap = {};
     message.reactions.forEach((r) => {
+      if (!r || !r.emoji) return;
       if (!reactionMap[r.emoji]) {
         reactionMap[r.emoji] = { emoji: r.emoji, count: 0, userReacted: false };
       }
       reactionMap[r.emoji].count++;
-      if (r.userId.toString() === currentUser?.id) {
+      const rUserId = typeof r.userId === 'object' ? r.userId?.id : r.userId;
+      if (rUserId && rUserId.toString() === currentUser?.id?.toString()) {
         reactionMap[r.emoji].userReacted = true;
       }
     });

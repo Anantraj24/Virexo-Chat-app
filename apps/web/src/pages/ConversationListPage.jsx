@@ -37,8 +37,15 @@ export function ConversationListPage() {
   const directMessages = conversations.filter((c) => c.type === 'direct');
 
   const getDMRecipient = (conv) => {
-    const otherMember = conv.members?.find((m) => (m.userId.id || m.userId).toString() !== user?.id);
-    return otherMember?.userId || { username: 'Unknown User', displayName: 'Unknown User' };
+    const otherMember = conv.members?.find((m) => {
+      const mUserId = m.user?.id || (typeof m.userId === 'object' ? m.userId?.id : m.userId);
+      return mUserId?.toString() !== user?.id?.toString();
+    });
+    return (
+      otherMember?.user ||
+      (typeof otherMember?.userId === 'object' ? otherMember?.userId : null) ||
+      { username: 'Unknown User', displayName: 'Unknown User' }
+    );
   };
 
   const filteredConversations = conversations.filter((c) => {

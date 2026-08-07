@@ -187,38 +187,43 @@ export default function SearchModal({ isOpen, onClose, onJumpToMessage, onStartC
                 </div>
               ) : (
                 <div className="space-y-1">
-                  {activeTab === 'messages' && results.messages.map((msg) => (
-                    <button
-                      key={msg.id}
-                      onClick={() => {
-                        onJumpToMessage(msg.conversationId?.id || msg.conversationId, msg.id);
-                        onClose();
-                      }}
-                      className="w-full text-left p-3 hover:bg-surface-light rounded-lg transition-colors flex gap-3 group"
-                    >
-                      <img 
-                        src={msg.senderId?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.senderId?.displayName || 'User')}&background=random`} 
-                        alt={msg.senderId?.displayName} 
-                        className="w-10 h-10 rounded-full shrink-0 mt-1 object-cover"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline justify-between gap-2 mb-1">
-                          <span className="font-medium text-sm text-text truncate">
-                            {msg.senderId?.displayName}
-                            {msg.conversationId?.type === 'group' && (
-                              <span className="text-text-muted font-normal ml-1">in {msg.conversationId?.name}</span>
-                            )}
-                          </span>
-                          <span className="text-xs text-text-muted shrink-0">
-                            {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
-                          </span>
+                  {activeTab === 'messages' && results.messages.map((msg) => {
+                    const sender = msg.sender || (typeof msg.senderId === 'object' ? msg.senderId : null);
+                    const senderName = sender?.displayName || sender?.username || 'User';
+                    const avatarUrl = sender?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(senderName)}&background=random`;
+                    return (
+                      <button
+                        key={msg.id}
+                        onClick={() => {
+                          onJumpToMessage(msg.conversationId?.id || msg.conversationId, msg.id);
+                          onClose();
+                        }}
+                        className="w-full text-left p-3 hover:bg-surface-light rounded-lg transition-colors flex gap-3 group"
+                      >
+                        <img 
+                          src={avatarUrl} 
+                          alt={senderName} 
+                          className="w-10 h-10 rounded-full shrink-0 mt-1 object-cover"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline justify-between gap-2 mb-1">
+                            <span className="font-medium text-sm text-text truncate">
+                              {senderName}
+                              {msg.conversationId?.type === 'group' && (
+                                <span className="text-text-muted font-normal ml-1">in {msg.conversationId?.name}</span>
+                              )}
+                            </span>
+                            <span className="text-xs text-text-muted shrink-0">
+                              {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
+                            </span>
+                          </div>
+                          <p className="text-sm text-text-muted line-clamp-2 leading-relaxed">
+                            {highlightText(msg.content, query)}
+                          </p>
                         </div>
-                        <p className="text-sm text-text-muted line-clamp-2 leading-relaxed">
-                          {highlightText(msg.content, query)}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
 
                   {activeTab === 'users' && results.users.map((u) => (
                     <button
@@ -248,13 +253,17 @@ export default function SearchModal({ isOpen, onClose, onJumpToMessage, onStartC
 
                   {activeTab === 'conversations' && results.conversations.map((conv) => {
                     const isGroup = conv.type === 'group';
-                    const otherMember = !isGroup ? conv.members.find(m => m.userId?.id !== user?.id)?.userId : null;
+                    const otherMember = !isGroup ? conv.members?.find(m => {
+                      const mUserId = m.user?.id || (typeof m.userId === 'object' ? m.userId?.id : m.userId);
+                      return mUserId?.toString() !== user?.id?.toString();
+                    }) : null;
+                    const targetUser = otherMember?.user || (typeof otherMember?.userId === 'object' ? otherMember?.userId : null);
                     
                     const avatarUrl = isGroup 
                       ? (conv.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.name || 'Group')}&background=random`)
-                      : (otherMember?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherMember?.displayName || 'User')}&background=random`);
+                      : (targetUser?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(targetUser?.displayName || 'User')}&background=random`);
                     
-                    const name = isGroup ? conv.name : otherMember?.displayName || 'Unknown User';
+                    const name = isGroup ? conv.name : (targetUser?.displayName || targetUser?.username || 'Unknown User');
 
                     return (
                       <button

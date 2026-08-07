@@ -27,9 +27,10 @@ export function GroupSettingsModal({ isOpen, onClose, conversation, onUpdated })
 
   if (!conversation || conversation.type === 'direct') return null;
 
-  const currentMemberInfo = conversation.members?.find(
-    (m) => (m.userId.id || m.userId).toString() === currentUser?.id
-  );
+  const currentMemberInfo = conversation.members?.find((m) => {
+    const mUserId = m.user?.id || (typeof m.userId === 'object' ? m.userId?.id : m.userId);
+    return mUserId?.toString() === currentUser?.id?.toString();
+  });
   const isOwner = currentMemberInfo?.role === 'owner';
   const isAdmin = currentMemberInfo?.role === 'admin' || isOwner;
 
@@ -140,8 +141,8 @@ export function GroupSettingsModal({ isOpen, onClose, conversation, onUpdated })
 
           <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1">
             {conversation.members?.map((m) => {
-              const u = m.userId;
-              const uId = (u.id || u).toString();
+              const u = m.user || (typeof m.userId === 'object' ? m.userId : null) || { username: 'Unknown', displayName: 'Unknown' };
+              const uId = u.id || (typeof m.userId === 'string' ? m.userId : '');
               const isSelf = uId === currentUser?.id;
 
               return (

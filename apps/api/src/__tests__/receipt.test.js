@@ -19,9 +19,11 @@ beforeEach(async () => {
 
 describe('Delivery & Read State Integration Tests (Phase 11)', () => {
   async function createTestUser(username, email, readReceipts = 'everyone') {
+    const uniqueName = `${username}_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+    const uniqueEmail = `${Date.now()}_${Math.random().toString(36).slice(2, 5)}_${email}`;
     return prisma.user.create({ data: {
-      username,
-      email,
+      username: uniqueName,
+      email: uniqueEmail,
       passwordHash: 'hashed_pass',
       privacySettings: { readReceipts },
     } });
@@ -45,7 +47,7 @@ describe('Delivery & Read State Integration Tests (Phase 11)', () => {
     const del1 = await markDelivered(conversationId, user2.id.toString());
     expect(del1).toBeTruthy();
 
-    const updatedConv = await prisma.conversation.findUnique({ where: { id: conversationId } });
+    const updatedConv = await prisma.conversation.findUnique({ where: { id: conversationId }, include: { members: true } });
     const member2 = updatedConv.members.find((m) => m.userId.toString() === user2.id.toString());
     expect(member2.lastDeliveredAt).toBeDefined();
   });
@@ -79,7 +81,7 @@ describe('Delivery & Read State Integration Tests (Phase 11)', () => {
     expect(result.lastReadAt).toBeInstanceOf(Date);
 
     // Verify DB state
-    const updatedConv = await prisma.conversation.findUnique({ where: { id: convId } });
+    const updatedConv = await prisma.conversation.findUnique({ where: { id: convId }, include: { members: true } });
     const member2 = updatedConv.members.find((m) => m.userId.toString() === user2.id.toString());
     expect(member2.lastReadAt.getTime()).toBeCloseTo(result.lastReadAt.getTime(), -2);
   });

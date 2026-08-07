@@ -23,7 +23,12 @@ describe('Search API Security Integration Tests', () => {
   };
 
   async function getAuthToken() {
-    const signupRes = await request(app).post('/api/v1/auth/signup').send(testUser);
+    const unique = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const signupRes = await request(app).post('/api/v1/auth/signup').send({
+      username: `search_${unique}`,
+      email: `tester_${unique}@example.com`,
+      password: 'Password123!',
+    });
     return signupRes.body.data.accessToken;
   }
 

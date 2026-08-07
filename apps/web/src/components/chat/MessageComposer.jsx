@@ -135,7 +135,10 @@ export function MessageComposer({
         <div className="flex items-center justify-between px-2 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg mb-2">
           <div className="flex items-center space-x-2 text-xs text-indigo-400">
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Replying to <strong>{replyingTo.senderId?.displayName || replyingTo.senderId?.username || 'Unknown'}</strong></span>
+            {(() => {
+              const replySender = replyingTo.sender || (typeof replyingTo.senderId === 'object' ? replyingTo.senderId : null);
+              return <span>Replying to <strong>{replySender?.displayName || replySender?.username || 'Unknown'}</strong></span>;
+            })()}
           </div>
           <button
             type="button"

@@ -7,7 +7,8 @@ export function MessageActionMenu({ message, currentUser, onEdit, onDelete, onDe
   const [showReactions, setShowReactions] = useState(false);
   const menuRef = useRef(null);
 
-  const isSender = message.senderId?.id === currentUser?.id;
+  const senderId = message.sender?.id || (typeof message.senderId === 'object' ? message.senderId?.id : message.senderId);
+  const isSender = senderId === currentUser?.id;
   const isPinned = message.isPinned;
   const canEdit = isSender && !message.isDeleted;
   const canDelete = isSender || currentUser?.role === 'owner' || currentUser?.role === 'admin';

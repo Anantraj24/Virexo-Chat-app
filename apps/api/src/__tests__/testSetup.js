@@ -28,20 +28,7 @@ export async function cleanCollections() {
   }
 
   // Delete all records in reverse dependency order
-  await prisma.$transaction([
-    prisma.adminAuditLog.deleteMany({}),
-    prisma.report.deleteMany({}),
-    prisma.notification.deleteMany({}),
-    prisma.messageAudit.deleteMany({}),
-    prisma.readReceipt.deleteMany({}),
-    prisma.reaction.deleteMany({}),
-    prisma.attachment.deleteMany({}),
-    prisma.message.deleteMany({}),
-    prisma.conversationMember.deleteMany({}),
-    prisma.conversation.deleteMany({}),
-    prisma.refreshToken.deleteMany({}),
-    prisma.user.deleteMany({}),
-  ]);
+  await prisma.$executeRawUnsafe(`TRUNCATE TABLE "AdminAuditLog", "Report", "Notification", "MessageAudit", "ReadReceipt", "Reaction", "Attachment", "Message", "ConversationMember", "Conversation", "RefreshToken", "User" CASCADE;`);
 }
 
 /**

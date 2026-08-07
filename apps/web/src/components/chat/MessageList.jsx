@@ -40,7 +40,7 @@ function formatReplyPreview(message, allMessages) {
   if (!message.replyTo) return null;
   const replyMessage = allMessages.find((m) => m.id === message.replyTo);
   if (!replyMessage) return null;
-  const sender = replyMessage.senderId || { username: 'Unknown', displayName: 'Unknown' };
+  const sender = replyMessage.sender || (typeof replyMessage.senderId === 'object' ? replyMessage.senderId : null) || { username: 'Unknown', displayName: 'Unknown' };
   const content = replyMessage.isDeleted ? '[This message was deleted]' : (replyMessage.content || '[Attachment]');
   return { senderName: sender.displayName || sender.username, content: content.substring(0, 60) };
 }
@@ -107,7 +107,7 @@ const MessageAttachment = memo(({ attachment }) => {
 MessageAttachment.displayName = 'MessageAttachment';
 
 const MessageItem = memo(({ message, isSelf, formatTime, currentUser, allMessages, onEdit, onDelete, onDeleteForEveryone, onReply, onPin, onUnpin, onReaction, onForward, onReport }) => {
-  const sender = message.senderId || { username: 'Unknown', displayName: 'Unknown' };
+  const sender = message.sender || (typeof message.senderId === 'object' ? message.senderId : null) || { username: 'Unknown', displayName: 'Unknown' };
   const showAvatar = !isSelf;
   const timeStr = message.createdAt ? formatTime(message.createdAt) : '';
   const replyPreview = formatReplyPreview(message, allMessages);
@@ -234,10 +234,12 @@ export function MessageList({
   useEffect(() => {
     if (messages.length > 0) {
       const latestMsg = messages[messages.length - 1];
-      const isSelf = latestMsg.senderId?.id === currentUser?.id;
+      const latestSenderId = latestMsg.sender?.id || (typeof latestMsg.senderId === 'object' ? latestMsg.senderId?.id : latestMsg.senderId);
+      const isSelf = latestSenderId === currentUser?.id;
       
       if (!isSelf && !latestMsg.isDeleted) {
-        const senderName = latestMsg.senderId?.displayName || latestMsg.senderId?.username || 'someone';
+        const sender = latestMsg.sender || (typeof latestMsg.senderId === 'object' ? latestMsg.senderId : null);
+        const senderName = sender?.displayName || sender?.username || 'someone';
         setAnnouncement(`New message from ${senderName}`);
         
         // Clear announcement to allow same string to be announced again if needed
@@ -323,7 +325,8 @@ export function MessageList({
           )}
 
           {messages.map((msg, index) => {
-            const isSelf = msg.senderId?.id === currentUser?.id;
+            const msgSenderId = msg.sender?.id || (typeof msg.senderId === 'object' ? msg.senderId?.id : msg.senderId);
+            const isSelf = msgSenderId === currentUser?.id;
             const prevMsg = index > 0 ? messages[index - 1] : null;
             const showDateSep = shouldShowDateSeparator(msg, prevMsg);
 

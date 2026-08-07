@@ -404,9 +404,15 @@ export async function editMessage(req, res, next) {
         content: content.trim(),
         isEdited: true,
         audit: {
-          update: {
-            editedAt: now,
-            editedById: currentUserId
+          upsert: {
+            create: {
+              editedAt: now,
+              editedById: currentUserId
+            },
+            update: {
+              editedAt: now,
+              editedById: currentUserId
+            }
           }
         }
       },
@@ -420,7 +426,7 @@ export async function editMessage(req, res, next) {
         conversationId: conversation.id,
         content: updatedMessage.content,
         isEdited: updatedMessage.isEdited,
-        editedAt: updatedMessage.audit.editedAt,
+        editedAt: updatedMessage.audit?.editedAt || now,
       });
     } catch {
       // Ignore if socket IO server is not booted in test mode
@@ -457,10 +463,17 @@ export async function deleteMessage(req, res, next) {
         isDeleted: true,
         content: '[This message was deleted]',
         audit: {
-          update: {
-            deletedAt: new Date(),
-            deletedById: currentUserId,
-            deletionScope: 'self'
+          upsert: {
+            create: {
+              deletedAt: new Date(),
+              deletedById: currentUserId,
+              deletionScope: 'self'
+            },
+            update: {
+              deletedAt: new Date(),
+              deletedById: currentUserId,
+              deletionScope: 'self'
+            }
           }
         }
       },
@@ -527,10 +540,17 @@ export async function deleteMessageForEveryone(req, res, next) {
         isDeleted: true,
         content: '[This message was deleted]',
         audit: {
-          update: {
-            deletedAt: new Date(),
-            deletedById: currentUserId,
-            deletionScope: 'everyone'
+          upsert: {
+            create: {
+              deletedAt: new Date(),
+              deletedById: currentUserId,
+              deletionScope: 'everyone'
+            },
+            update: {
+              deletedAt: new Date(),
+              deletedById: currentUserId,
+              deletionScope: 'everyone'
+            }
           }
         }
       },

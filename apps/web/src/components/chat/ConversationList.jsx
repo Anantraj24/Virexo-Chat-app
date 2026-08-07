@@ -10,12 +10,24 @@ export function ConversationList({ conversations, currentUserId, loading, search
   const channels = conversations.filter((c) => c.type === 'group' || c.type === 'channel');
   const directMessages = conversations.filter((c) => c.type === 'direct');
 
+  const getDMRecipient = (conv) => {
+    const otherMember = conv.members?.find((m) => {
+      const mUserId = m.user?.id || (typeof m.userId === 'object' ? m.userId?.id : m.userId);
+      return mUserId?.toString() !== currentUserId?.toString();
+    });
+    return (
+      otherMember?.user ||
+      (typeof otherMember?.userId === 'object' ? otherMember?.userId : null) ||
+      { username: 'Unknown User', displayName: 'Unknown User' }
+    );
+  };
+
   const filteredConversations = conversations.filter((c) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     if (c.type === 'direct') {
-      const otherMember = c.members?.find((m) => (m.userId.id || m.userId).toString() !== currentUserId);
-      const name = otherMember?.userId?.displayName || otherMember?.userId?.username || '';
+      const recipient = getDMRecipient(c);
+      const name = recipient.displayName || recipient.username || '';
       return name.toLowerCase().includes(query);
     }
     return (c.name || '').toLowerCase().includes(query);
@@ -23,11 +35,6 @@ export function ConversationList({ conversations, currentUserId, loading, search
 
   const filteredChannels = filteredConversations.filter((c) => c.type === 'group' || c.type === 'channel');
   const filteredDMs = filteredConversations.filter((c) => c.type === 'direct');
-
-  const getDMRecipient = (conv) => {
-    const otherMember = conv.members?.find((m) => (m.userId.id || m.userId).toString() !== currentUserId);
-    return otherMember?.userId || { username: 'Unknown User', displayName: 'Unknown User' };
-  };
 
   if (loading) {
     return (

@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { describe, it, expect, beforeEach, vi, afterEach, beforeAll, afterAll } from 'vitest';
 import app from '../app.js';
-import { setupTestDB, teardownTestDB, cleanCollections, prisma } from './testSetup.js';
+import { setupTestDB, teardownTestDB, cleanCollections, prisma, createTestUser } from './testSetup.js';
 import { generateAccessToken } from '../utils/token.js';
 
 vi.mock('../utils/socket.js', () => ({
@@ -34,29 +34,11 @@ describe('Message Operations API', () => {
     
     
 
-    user1 = await prisma.user.create({ data: {
-      username: 'user1',
-      email: 'user1@example.com',
-      passwordHash: 'hashed1',
-      isEmailVerified: true,
-    } });
-    token1 = generateAccessToken(user1);
+    const u1 = await createTestUser(); user1 = u1.user; token1 = u1.token;
 
-    user2 = await prisma.user.create({ data: {
-      username: 'user2',
-      email: 'user2@example.com',
-      passwordHash: 'hashed2',
-      isEmailVerified: true,
-    } });
-    token2 = generateAccessToken(user2);
+    const u2 = await createTestUser(); user2 = u2.user; token2 = u2.token;
 
-    user3 = await prisma.user.create({ data: {
-      username: 'user3',
-      email: 'user3@example.com',
-      passwordHash: 'hashed3',
-      isEmailVerified: true,
-    } });
-    token3 = generateAccessToken(user3);
+    const u3 = await createTestUser(); user3 = u3.user; token3 = u3.token;
 
     conversation = await prisma.conversation.create({ data: {
       type: 'direct',
@@ -202,7 +184,7 @@ describe('Message Operations API', () => {
         .set('Authorization', `Bearer ${token1}`);
 
       expect(res.status).toBe(200);
-      const dbMsg = await prisma.message.findUnique({ where: { id: message.id } });
+      const dbMsg = await prisma.message.findUnique({ where: { id: message.id }, include: { reactions: true } });
       expect(dbMsg.isPinned).toBe(true);
     });
 
@@ -229,7 +211,7 @@ describe('Message Operations API', () => {
       expect(res.status).toBe(200);
       const dbMsg = await prisma.message.findUnique({ where: { id: groupMessage.id } });
       expect(dbMsg.isPinned).toBe(true);
-      expect(dbMsg.pinnedBy.toString()).toBe(user2.id.toString());
+      expect(dbMsg.pinnedById).toBe(user2.id);
     });
 
     it('should allow admin to unpin', async () => {
@@ -247,7 +229,7 @@ describe('Message Operations API', () => {
         senderId: user1.id,
         content: 'Group msg',
         isPinned: true,
-        pinnedBy: user2.id,
+        pinnedById: user2.id,
       } });
 
       const res = await request(app)
@@ -268,15 +250,15 @@ describe('Message Operations API', () => {
         .send({ emoji: '👍' });
 
       expect(res.status).toBe(200);
-      const dbMsg = await prisma.message.findUnique({ where: { id: message.id } });
+      const dbMsg = await prisma.message.findUnique({ where: { id: message.id }, include: { reactions: true } });
       expect(dbMsg.reactions.length).toBe(1);
       expect(dbMsg.reactions[0].emoji).toBe('👍');
-      expect(dbMsg.reactions[0].userId.toString()).toBe(user2.id.toString());
+      expect(dbMsg.reactions[0].userId).toBe(user2.id);
     });
 
     it('should remove reaction', async () => {
       await prisma.message.update({ where: { id: message.id }, data: {
-        reactions: [{ emoji: '👍', userId: user2.id }],
+        reactions: { create: [{ emoji: '👍', userId: user2.id }] },
       } });
 
       const res = await request(app)
@@ -285,7 +267,7 @@ describe('Message Operations API', () => {
         .send({ emoji: '👍' });
 
       expect(res.status).toBe(200);
-      const dbMsg = await prisma.message.findUnique({ where: { id: message.id } });
+      const dbMsg = await prisma.message.findUnique({ where: { id: message.id }, include: { reactions: true } });
       expect(dbMsg.reactions.length).toBe(0);
     });
   });
@@ -306,7 +288,7 @@ describe('Message Operations API', () => {
         .send({ conversationId: conv2.id });
 
       expect(res.status).toBe(201);
-      expect(res.body.data.message.forwardedFrom).toBe(message.id.toString());
+      expect(res.body.data.message.forwardedFromId || res.body.data.message.forwardedFrom).toBe(message.id);
       expect(res.body.data.message.conversationId.toString()).toBe(conv2.id.toString());
     });
 

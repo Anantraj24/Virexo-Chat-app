@@ -35,12 +35,24 @@ export function ForwardMessageModal({ isOpen, onClose, message }) {
 
   if (!isOpen) return null;
 
+  const getDMRecipient = (conv) => {
+    const otherMember = conv.members?.find((m) => {
+      const mUserId = m.user?.id || (typeof m.userId === 'object' ? m.userId?.id : m.userId);
+      return mUserId?.toString() !== user?.id?.toString();
+    });
+    return (
+      otherMember?.user ||
+      (typeof otherMember?.userId === 'object' ? otherMember?.userId : null) ||
+      { username: 'Unknown', displayName: 'Unknown' }
+    );
+  };
+
   const filteredConversations = conversations.filter((c) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     if (c.type === 'direct') {
-      const otherMember = c.members?.find((m) => (m.userId.id || m.userId).toString() !== user?.id);
-      const name = otherMember?.userId?.displayName || otherMember?.userId?.username || '';
+      const recipient = getDMRecipient(c);
+      const name = recipient.displayName || recipient.username || '';
       return name.toLowerCase().includes(query);
     }
     return (c.name || '').toLowerCase().includes(query);
@@ -58,11 +70,6 @@ export function ForwardMessageModal({ isOpen, onClose, message }) {
     } finally {
       setForwarding(false);
     }
-  };
-
-  const getDMRecipient = (conv) => {
-    const otherMember = conv.members?.find((m) => (m.userId.id || m.userId).toString() !== user?.id);
-    return otherMember?.userId || { username: 'Unknown', displayName: 'Unknown' };
   };
 
   return (
