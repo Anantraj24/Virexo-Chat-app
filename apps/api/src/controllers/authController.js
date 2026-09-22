@@ -124,16 +124,23 @@ export async function signup(req, res, next) {
 // Login Controller
 export async function login(req, res, next) {
   try {
-    const { email, password, rememberMe = true } = req.body;
+    const { identifier, password, rememberMe = true } = req.body;
 
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: identifier.toLowerCase() },
+          { username: identifier.toLowerCase() },
+        ],
+      },
+    });
     if (!user) {
-      throw new UnauthorizedError('Invalid email or password', 'INVALID_CREDENTIALS');
+      throw new UnauthorizedError('Invalid username/email or password', 'INVALID_CREDENTIALS');
     }
 
     const isMatch = await comparePassword(password, user.passwordHash);
     if (!isMatch) {
-      throw new UnauthorizedError('Invalid email or password', 'INVALID_CREDENTIALS');
+      throw new UnauthorizedError('Invalid username/email or password', 'INVALID_CREDENTIALS');
     }
 
     const familyId = crypto.randomUUID();

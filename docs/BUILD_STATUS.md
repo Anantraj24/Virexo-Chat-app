@@ -209,3 +209,10 @@
 - [x] Redesigned `MessageList.jsx` with speech bubble tails, bottom-right inline timestamp + checkmark badges, and vertical green accent reply cards.
 - [x] Redesigned `MessageComposer.jsx` with emoji picker icon, attachment clip button, pill-shaped text input (`#2a3942`), and circular emerald green send button (`#00a884`).
 - [x] Redesigned `ConversationList.jsx` with WhatsApp active conversation highlights (`#2a3942`) and emerald unread badge counters (`#00a884`).
+
+### Phase 24: Username/Email Dual Authentication & Home Chat UI
+- [x] Backend `loginRules` updated to accept `identifier` (username or email).
+- [x] Backend `authController.login` queries user by username or email.
+- [x] Frontend `LoginPage` redesigned with WhatsApp color tokens and dual username/email field (`validateIdentifier`).
+- [x] Frontend `HomePage` updated to a clean WhatsApp Web-style empty state with doodle wallpaper and conversational prompts.
+- [x] Verified login with credentials `anant` / `anant123` and `shubham` / `shubham123`.

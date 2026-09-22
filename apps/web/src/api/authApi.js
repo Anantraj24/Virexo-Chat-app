@@ -5,8 +5,8 @@ const AUTH_BASE = '/api/v1/auth';
 export const signupRequest = ({ username, email, password }) =>
   apiClient.post(`${AUTH_BASE}/signup`, { username, email, password });
 
-export const loginRequest = ({ email, password, rememberMe = true }) =>
-  apiClient.post(`${AUTH_BASE}/login`, { email, password, rememberMe });
+export const loginRequest = ({ identifier, password, rememberMe = true }) =>
+  apiClient.post(`${AUTH_BASE}/login`, { identifier, password, rememberMe });
 
 export const refreshRequest = () =>
   apiClient.post(`${AUTH_BASE}/refresh`);

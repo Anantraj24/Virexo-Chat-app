@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
-import { Mail, Lock, LogIn } from 'lucide-react';
+import { User, Lock, LogIn } from 'lucide-react';
 import { useToast } from '../components/ui/Toast';
 import { loginRequest } from '../api/authApi';
 import { useAuthStore } from '../store/useAuthStore';
-import { validateEmail, validatePassword } from '../lib/validation';
+import { validateIdentifier } from '../lib/validation';
 
 export function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [errors, setErrors] = useState({});
@@ -27,12 +27,12 @@ export function LoginPage() {
     e.preventDefault();
     setServerError('');
 
-    const emailErr = validateEmail(email);
-    const passwordErr = validatePassword(password);
+    const identifierErr = validateIdentifier(identifier);
+    const passwordErr = !password ? 'Password is required' : null;
 
-    if (emailErr || passwordErr) {
+    if (identifierErr || passwordErr) {
       setErrors({
-        email: emailErr,
+        identifier: identifierErr,
         password: passwordErr,
       });
       return;
@@ -42,48 +42,46 @@ export function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await loginRequest({ email, password, rememberMe });
+      const response = await loginRequest({ identifier, password, rememberMe });
       const { user, accessToken } = response.data;
 
       setAuth(user, accessToken);
-      addToast({ message: `Welcome back, ${user.username}!`, type: 'success' });
+      addToast({ message: `Welcome back, ${user.displayName || user.username}!`, type: 'success' });
       navigate(from, { replace: true });
     } catch (err) {
-      setServerError(err.message || 'Invalid email or password');
+      setServerError(err.message || 'Invalid username or password');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center p-4 min-h-[calc(100vh-4rem)] bg-matte-editorial">
-      <div className="w-full max-w-md bg-zinc-950/80 border border-zinc-800/80 rounded-3xl p-8 backdrop-blur-2xl shadow-2xl space-y-6 relative overflow-hidden">
-        {/* Glow accent */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+    <div className="flex-1 flex items-center justify-center p-4 min-h-[calc(100vh-4rem)]" style={{ backgroundColor: '#111b21' }}>
+      <div className="w-full max-w-md rounded-2xl p-8 space-y-6 relative overflow-hidden" style={{ backgroundColor: '#1f2c34', border: '1px solid #2a3942' }}>
 
         <div className="text-center space-y-1">
-          <h2 className="text-2xl font-serif tracking-tight text-gradient-sunset font-medium">Welcome Back</h2>
-          <p className="text-xs text-zinc-400 font-light">Sign in to your Virexo real-time account</p>
+          <h2 className="text-2xl font-semibold tracking-tight" style={{ color: '#e9edef' }}>Virexo</h2>
+          <p className="text-xs" style={{ color: '#8696a0' }}>Sign in with your username or email</p>
         </div>
 
         {serverError && (
-          <div className="p-3.5 rounded-xl border border-rose-800/60 bg-rose-950/80 text-rose-200 text-xs font-medium">
+          <div className="p-3.5 rounded-xl text-xs font-medium" style={{ border: '1px solid #4a2020', backgroundColor: '#2d1515', color: '#f5a5a5' }}>
             {serverError}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
-            label="Email Address"
-            type="email"
-            placeholder="alex@example.com"
-            leftIcon={<Mail className="w-4 h-4 text-amber-200/70" />}
-            value={email}
+            label="Username or Email"
+            type="text"
+            placeholder="anant"
+            leftIcon={<User className="w-4 h-4" style={{ color: '#00a884' }} />}
+            value={identifier}
             onChange={(e) => {
-              setEmail(e.target.value);
-              if (errors.email) setErrors((prev) => ({ ...prev, email: null }));
+              setIdentifier(e.target.value);
+              if (errors.identifier) setErrors((prev) => ({ ...prev, identifier: null }));
             }}
-            error={errors.email}
+            error={errors.identifier}
             required
           />
 
@@ -92,7 +90,7 @@ export function LoginPage() {
               label="Password"
               type="password"
               placeholder="••••••••"
-              leftIcon={<Lock className="w-4 h-4 text-amber-200/70" />}
+              leftIcon={<Lock className="w-4 h-4" style={{ color: '#00a884' }} />}
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
@@ -102,16 +100,17 @@ export function LoginPage() {
               required
             />
             <div className="flex items-center justify-between mt-2.5">
-              <label className="flex items-center space-x-2 text-xs text-zinc-400 cursor-pointer select-none">
+              <label className="flex items-center space-x-2 text-xs cursor-pointer select-none" style={{ color: '#8696a0' }}>
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded border-zinc-700 bg-zinc-900 text-amber-400 focus:ring-amber-400 focus:ring-offset-zinc-950"
+                  className="w-3.5 h-3.5 rounded"
+                  style={{ accentColor: '#00a884' }}
                 />
                 <span>Remember me</span>
               </label>
-              <Link to="/forgot-password" className="text-xs text-amber-200/90 hover:text-amber-100 font-medium">
+              <Link to="/forgot-password" className="text-xs font-medium hover:underline" style={{ color: '#00a884' }}>
                 Forgot password?
               </Link>
             </div>
@@ -125,16 +124,17 @@ export function LoginPage() {
               size="lg"
               isLoading={loading}
               leftIcon={<LogIn className="w-4 h-4" />}
-              className="gold-wireframe-btn uppercase tracking-[0.2em] font-semibold text-xs py-3.5 rounded-none"
+              className="font-semibold text-sm py-3 rounded-lg"
+              style={{ backgroundColor: '#00a884', color: '#111b21', border: 'none' }}
             >
               Sign In
             </Button>
           </div>
         </form>
 
-        <div className="text-center text-xs text-zinc-500 font-light pt-2">
+        <div className="text-center text-xs pt-2" style={{ color: '#8696a0' }}>
           Don&apos;t have an account?{' '}
-          <Link to="/register" className="text-amber-200 hover:text-amber-100 font-medium underline underline-offset-4">
+          <Link to="/register" className="font-medium underline underline-offset-4 hover:opacity-80" style={{ color: '#00a884' }}>
             Create account
           </Link>
         </div>

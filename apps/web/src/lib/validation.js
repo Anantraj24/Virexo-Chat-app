@@ -9,6 +9,11 @@ export function validateEmail(email) {
   return null;
 }
 
+export function validateIdentifier(identifier) {
+  if (!identifier || !identifier.trim()) return 'Username or email is required';
+  return null;
+}
+
 export function validatePassword(password) {
   if (!password) return 'Password is required';
   if (password.length < 8) return 'Password must be at least 8 characters';

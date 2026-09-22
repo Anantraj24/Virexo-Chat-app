@@ -34,11 +34,10 @@ export const signupRules = [
 ];
 
 export const loginRules = [
-  body('email')
+  body('identifier')
     .trim()
-    .toLowerCase()
-    .isEmail()
-    .withMessage('Must be a valid email address'),
+    .notEmpty()
+    .withMessage('Username or email is required'),
   body('password')
     .notEmpty()
     .withMessage('Password is required'),
