@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+const STABLE_EMPTY_ARRAY = Object.freeze([]);
+
 export const useSocketStore = create((set, get) => ({
   connected: false,
   onlineUsers: {}, // userId -> 'online' | 'offline'
@@ -93,7 +95,9 @@ export const useSocketStore = create((set, get) => ({
   },
 
   getTypingUsersForConversation: (conversationId) => {
-    const map = get().typingIndicators[conversationId] || {};
-    return Object.values(map);
+    const map = get().typingIndicators[conversationId];
+    if (!map) return STABLE_EMPTY_ARRAY;
+    const values = Object.values(map);
+    return values.length === 0 ? STABLE_EMPTY_ARRAY : values;
   },
 }));

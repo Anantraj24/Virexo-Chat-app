@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useToast } from '../components/ui/Toast';
 import { useSocketStore } from '../store/useSocketStore';
@@ -27,7 +27,11 @@ const SCROLL_THRESHOLD = 100;
 export function useChat(conversationId, jumpToMessageId = null) {
   const { user: currentUser } = useAuthStore();
   const { addToast } = useToast();
-  const typingUsers = useSocketStore((state) => state.getTypingUsersForConversation(conversationId));
+  const typingIndicatorsMap = useSocketStore((state) => state.typingIndicators[conversationId]);
+  const typingUsers = useMemo(() => {
+    if (!typingIndicatorsMap) return [];
+    return Object.values(typingIndicatorsMap);
+  }, [typingIndicatorsMap]);
 
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);

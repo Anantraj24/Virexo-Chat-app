@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
-import { APP_NAME } from '@virexo/shared';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { usePreferencesStore } from '../store/usePreferencesStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useToast } from '../components/ui/Toast';
@@ -12,41 +11,56 @@ import { NewDMModal } from '../components/NewDMModal';
 import { CreateGroupModal } from '../components/CreateGroupModal';
 import { GroupSettingsModal } from '../components/GroupSettingsModal';
 import SearchModal from '../components/SearchModal';
-import { apiClient as api } from '../api/axiosClient';
 import { ConversationList } from '../components/chat/ConversationList';
 import { NotificationBell } from '../components/notifications/NotificationBell';
 import { useGlobalSocket } from '../hooks/useGlobalSocket';
 import {
+  Home,
+  Mail,
+  Users,
+  Calendar,
+  Target,
+  LayoutGrid,
+  Network,
+  ClipboardList,
   Settings,
-  Menu,
-  X,
+  LogOut,
+  SlidersHorizontal,
+  HelpCircle,
   Sun,
   Moon,
   Laptop,
   Search,
-  Bell,
-  LogOut,
+  MoreHorizontal,
+  ChevronDown,
   ShieldAlert,
   AlertTriangle,
-  Mail,
+  Menu,
+  X,
+  Plus
 } from 'lucide-react';
 
 export function AppLayout() {
-  const { theme, setTheme, sidebarOpen, toggleSidebar, setSidebarOpen } = usePreferencesStore();
+  const { theme, setTheme } = usePreferencesStore();
   const { user, clearAuth } = useAuthStore();
   const { addToast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useGlobalSocket();
 
   const [resendingEmail, setResendingEmail] = useState(false);
   const [conversations, setConversations] = useState([]);
   const [loadingConversations, setLoadingConversations] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [dmModalOpen, setDmModalOpen] = useState(false);
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [activeGroupSettings, setActiveGroupSettings] = useState(null);
+
+  // Active inbox section state
+  const [activeFolder, setActiveFolder] = useState('Chats');
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -128,216 +142,326 @@ export function AppLayout() {
   ];
 
   return (
-    <div className="h-screen w-screen bg-zinc-950 text-zinc-100 flex overflow-hidden selection:bg-indigo-500 selection:text-white">
-      {/* Mobile Sidebar Overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-xs"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar Panel */}
-      <aside
-        className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-zinc-900 border-r border-zinc-800/80 flex flex-col transition-transform duration-200 ease-in-out ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        }`}
-      >
-        {/* Workspace Brand Header */}
-        <div className="h-14 px-4 border-b border-zinc-800/80 flex items-center justify-between shrink-0">
-          <a href="/" className="flex items-center space-x-2.5">
-            <div className="w-7 h-7 rounded-lg bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold text-sm">
-              V
-            </div>
-            <span className="font-bold text-sm tracking-tight text-white">{APP_NAME} Community</span>
-          </a>
-
-          <button
-            onClick={toggleSidebar}
-            className="md:hidden text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Conversation List */}
-        <div className="flex-1 overflow-y-auto flex flex-col">
-          <div className="px-3 pt-3 pb-1 space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Channels</span>
+    <div className="h-screen w-screen bg-[#edf2f7] dark:bg-zinc-950 p-2 sm:p-3 overflow-hidden flex flex-col font-sans select-none">
+      {/* Outer Card Container with rounded corners & shadow matching reference UI */}
+      <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 rounded-2xl border border-slate-200/90 dark:border-zinc-800 shadow-sm overflow-hidden min-h-0">
+        
+        {/* Top Header Bar matching screenshot */}
+        <header className="h-14 px-4 border-b border-slate-100 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 flex items-center justify-between shrink-0">
+          {/* Left: Brand Icon + Search Bar with Filter Sliders */}
+          <div className="flex items-center space-x-4 flex-1 max-w-xl">
+            {/* Logo Mark matching screenshot */}
+            <div className="flex items-center space-x-2">
               <button
-                onClick={() => setGroupModalOpen(true)}
-                className="hover:text-white p-0.5 rounded transition cursor-pointer"
-                title="Create Group Channel"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800"
               >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
+                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
+
+              <a href="/" className="flex items-center">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center text-white font-bold text-sm shadow-xs">
+                  V
+                </div>
+              </a>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">DMs</span>
+
+            {/* Search Input with Sliders Icon */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search"
+                onClick={() => setSearchModalOpen(true)}
+                readOnly
+                className="w-full bg-slate-50 dark:bg-zinc-800/60 text-xs text-slate-800 dark:text-zinc-100 placeholder-slate-400 pl-8 pr-8 py-2 rounded-xl border border-slate-200/80 dark:border-zinc-700/80 focus:outline-none cursor-pointer"
+              />
               <button
-                onClick={() => setDmModalOpen(true)}
-                className="hover:text-white p-0.5 rounded transition cursor-pointer"
-                title="New Direct Message"
+                onClick={() => setSearchModalOpen(true)}
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200"
               >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
+                <SlidersHorizontal className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          <ConversationList
-            conversations={conversations}
-            currentUserId={user?.id}
-            loading={loadingConversations}
-            searchQuery=""
-          />
-        </div>
+          {/* Right: Setup Guide Dropdown + Notification Bell + Help */}
+          <div className="flex items-center space-x-2.5">
+            <button className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-slate-200/90 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs font-medium text-slate-700 dark:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-700 transition cursor-pointer">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span>Setup guide</span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1" />
+            </button>
 
-        {/* User Profile & Theme Footer */}
-        <div className="p-3 border-t border-zinc-800/80 bg-zinc-950/60 shrink-0 flex items-center justify-between">
-          <Dropdown
-            trigger={
-              <div className="flex items-center space-x-2.5 p-1 rounded-lg hover:bg-zinc-800/60 transition group text-left cursor-pointer">
-                <Avatar name={user?.displayName || user?.username || 'User'} status={user?.status || 'online'} size="sm" src={user?.avatarUrl} />
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-semibold text-zinc-200 truncate group-hover:text-white">
-                    {user?.displayName || user?.username || 'User'}
-                  </div>
-                  <div className="text-[10px] text-zinc-400 truncate">@{user?.username || ''}</div>
-                </div>
-              </div>
-            }
-            items={userMenuItems}
-            align="left"
-          />
-
-          <div className="flex items-center space-x-1">
             <NotificationBell />
+
             <Dropdown
               trigger={
-                <button className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer">
+                <button className="p-2 rounded-xl text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer" title="Theme">
                   {theme === 'light' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                 </button>
               }
               items={themeItems}
             />
 
-            <a
-              href="/settings"
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
-              title="Settings"
-            >
-              <Settings className="w-4 h-4" />
-            </a>
+            <button className="p-2 rounded-xl text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer" title="Help">
+              <HelpCircle className="w-4 h-4" />
+            </button>
           </div>
-        </div>
-      </aside>
+        </header>
 
-      {/* Main App Content View */}
-      <div className="flex-1 flex flex-col min-w-0 bg-zinc-950">
-        {/* Email Verification Banner */}
+        {/* Verification banner if applicable */}
         {user && !user.isEmailVerified && (
-          <div className="bg-amber-950/60 border-b border-amber-800/60 px-4 py-2 flex items-center justify-between text-xs text-amber-200">
+          <div className="bg-amber-50 dark:bg-amber-950/60 border-b border-amber-200/80 dark:border-amber-800/60 px-4 py-2 flex items-center justify-between text-xs text-amber-800 dark:text-amber-200">
             <div className="flex items-center space-x-2">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
               <span>Please verify your email address to unlock full features.</span>
             </div>
             <button
               onClick={handleResendVerification}
               disabled={resendingEmail}
-              className="text-amber-400 hover:text-amber-300 font-semibold underline flex items-center space-x-1 cursor-pointer disabled:opacity-50"
+              className="text-amber-700 dark:text-amber-400 hover:underline font-semibold cursor-pointer disabled:opacity-50"
             >
-              <Mail className="w-3.5 h-3.5 inline mr-1" />
-              <span>{resendingEmail ? 'Sending...' : 'Resend Email'}</span>
+              {resendingEmail ? 'Sending...' : 'Resend Email'}
             </button>
           </div>
         )}
 
-        {/* Main App Top Header */}
-        <header className="h-14 px-4 border-b border-zinc-800/80 bg-zinc-900/40 flex items-center justify-between shrink-0">
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={toggleSidebar}
-              className="md:hidden text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition cursor-pointer"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <div className="flex items-center space-x-2 text-xs text-zinc-400 font-medium">
-              <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              <span className="text-zinc-200 font-semibold">Virexo Workspace</span>
-            </div>
-          </div>
+        {/* Multi-Column Main Workspace */}
+        <div className="flex-1 flex overflow-hidden min-h-0 relative">
+          
+          {/* Column 1: Ultra-narrow Icon Dock (~60px) matching screenshot */}
+          <aside className="w-14 border-r border-slate-100 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 flex flex-col items-center py-4 justify-between shrink-0">
+            {/* Top Navigation Icons */}
+            <div className="flex flex-col items-center space-y-4">
+              <button 
+                onClick={() => navigate('/')}
+                className="p-2 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer" 
+                title="Home"
+              >
+                <Home className="w-4 h-4" />
+              </button>
 
-          <div className="flex items-center space-x-2">
-            <div className="relative hidden sm:block w-48">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-zinc-500" />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="w-full bg-zinc-900 text-xs text-zinc-200 placeholder-zinc-500 pl-8 pr-3 py-1.5 rounded-lg border border-zinc-800 focus:outline-none focus:border-indigo-500/50"
+              <button 
+                onClick={() => navigate('/')}
+                className="p-2 rounded-xl text-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/60 dark:text-indigo-400 transition cursor-pointer shadow-2xs" 
+                title="Messages"
+              >
+                <Mail className="w-4 h-4" />
+              </button>
+
+              <button 
+                onClick={() => setDmModalOpen(true)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-800 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer" 
+                title="Contacts"
+              >
+                <Users className="w-4 h-4" />
+              </button>
+
+              <button className="p-2 rounded-xl text-slate-400 hover:text-slate-800 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer" title="Calendar">
+                <Calendar className="w-4 h-4" />
+              </button>
+
+              <button className="p-2 rounded-xl text-slate-400 hover:text-slate-800 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer" title="Analytics">
+                <Target className="w-4 h-4" />
+              </button>
+
+              <button className="p-2 rounded-xl text-slate-400 hover:text-slate-800 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer" title="Apps">
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+
+              <button className="p-2 rounded-xl text-slate-400 hover:text-slate-800 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer" title="Integrations">
+                <Network className="w-4 h-4" />
+              </button>
+
+              <button className="p-2 rounded-xl text-slate-400 hover:text-slate-800 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer" title="Tasks">
+                <ClipboardList className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Bottom Controls: Settings, LogOut, and User Avatar */}
+            <div className="flex flex-col items-center space-y-3">
+              <button 
+                onClick={() => navigate('/settings')}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-800 dark:hover:text-zinc-200 hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer" 
+                title="Settings"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+
+              <button 
+                onClick={handleLogout}
+                className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-zinc-800 transition cursor-pointer" 
+                title="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+
+              {/* User Avatar with Green Online Dot */}
+              <Dropdown
+                trigger={
+                  <div className="relative cursor-pointer">
+                    <Avatar
+                      name={user?.displayName || user?.username || 'User'}
+                      src={user?.avatarUrl}
+                      status="online"
+                      size="sm"
+                      className="w-7 h-7 text-xs"
+                    />
+                  </div>
+                }
+                items={userMenuItems}
+                align="left"
               />
             </div>
+          </aside>
 
-            <button className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition cursor-pointer">
-              <Bell className="w-4 h-4" />
-            </button>
-          </div>
-        </header>
+          {/* Column 2: Inbox & Channels Sub-Sidebar (~220px) matching screenshot */}
+          <aside className={`w-56 border-r border-slate-100 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 flex flex-col py-4 px-3 shrink-0 overflow-y-auto ${mobileMenuOpen ? 'block' : 'hidden lg:flex'}`}>
+            {/* Inbox Title & Email */}
+            <div className="flex items-center justify-between px-2 mb-3">
+              <div>
+                <h3 className="text-xs font-semibold text-slate-900 dark:text-zinc-100">
+                  Inbox
+                </h3>
+                <p className="text-[11px] text-slate-400 truncate max-w-[140px]">
+                  {user?.email || 'wilson@gmail.com'}
+                </p>
+              </div>
+              <button className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200">
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </button>
+            </div>
 
-        {/* View Router Outlet */}
-        <main className="flex-1 flex flex-col min-w-0">
-          <Outlet />
-        </main>
+            {/* Folder Items */}
+            <div className="space-y-0.5 mb-6 text-xs">
+              {[
+                { label: 'Email', badge: 4, icon: Mail },
+                { label: 'Chats', badge: 6, icon: null },
+                { label: 'Scheduled', badge: 1, icon: null },
+                { label: 'Assigned', badge: null, icon: null },
+                { label: 'Closed', badge: null, icon: null },
+                { label: 'Starred', badge: null, icon: null },
+                { label: 'Archived', badge: null, icon: null },
+              ].map((folder) => {
+                const isActive = activeFolder === folder.label;
+                return (
+                  <button
+                    key={folder.label}
+                    onClick={() => setActiveFolder(folder.label)}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl transition cursor-pointer text-left ${
+                      isActive
+                        ? 'bg-slate-100/90 dark:bg-zinc-800 font-semibold text-slate-900 dark:text-zinc-100'
+                        : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50'
+                    }`}
+                  >
+                    <span>{folder.label}</span>
+                    {folder.badge && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200/80 dark:bg-zinc-700 text-slate-600 dark:text-zinc-300 font-semibold">
+                        {folder.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Channels Section */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between px-2 mb-2">
+                <span className="text-[11px] font-semibold text-slate-400 dark:text-zinc-400 uppercase tracking-wider flex items-center space-x-1">
+                  <ChevronDown className="w-3 h-3" />
+                  <span>Channels</span>
+                </span>
+                <button
+                  onClick={() => setGroupModalOpen(true)}
+                  className="p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition"
+                  title="Create channel"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {[
+                { name: 'Gmail', badge: 4, color: '#EA4335' },
+                { name: 'Telegram', badge: 2, color: '#0088CC' },
+                { name: 'WhatsApp', badge: 2, color: '#25D366' },
+                { name: 'Messenger', badge: 3, color: '#0084FF' },
+                { name: 'Messenger', badge: 1, color: '#0084FF' },
+              ].map((channel, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between px-3 py-1.5 rounded-xl text-xs text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 transition cursor-pointer"
+                >
+                  <div className="flex items-center space-x-2">
+                    <span 
+                      className="w-2 h-2 rounded-full" 
+                      style={{ backgroundColor: channel.color }}
+                    />
+                    <span>{channel.name}</span>
+                  </div>
+                  {channel.badge && (
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-zinc-800 text-slate-500 font-medium">
+                      {channel.badge}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </aside>
+
+          {/* Column 3: Messages List (~320px) matching screenshot */}
+          <ConversationList
+            conversations={conversations}
+            currentUserId={user?.id}
+            loading={loadingConversations}
+            onNewChat={() => setDmModalOpen(true)}
+          />
+
+          {/* Column 4 & 5: Center Chat & Right Details Drawer */}
+          <main className="flex-1 flex min-w-0 bg-white dark:bg-zinc-900 overflow-hidden">
+            <Outlet />
+          </main>
+        </div>
       </div>
 
+      {/* Modals */}
       <SearchModal
         isOpen={searchModalOpen}
         onClose={() => setSearchModalOpen(false)}
-        onJumpToMessage={(conversationId, messageId) => {
-          setSearchModalOpen(false);
-          // Navigate to channel with jump params (will be handled by useChat)
-          navigate(`/channels/${conversationId}?jumpTo=${messageId}`);
-        }}
-        onStartConversation={async (targetId, isConversationId = false) => {
-          setSearchModalOpen(false);
-          if (isConversationId) {
-            navigate(`/channels/${targetId}`);
-          } else {
-            // Need to start DM or navigate to existing
-            try {
-              const res = await api.post('/conversations/direct', { recipientId: targetId });
-              await fetchConversations();
-              navigate(`/dms/${res.data.conversation.id}`);
-            } catch (err) {
-              addToast({ message: err.response?.data?.message || 'Failed to start conversation', type: 'error' });
-            }
-          }
-        }}
+        conversations={conversations}
+        currentUserId={user?.id}
       />
 
-      {/* Modals */}
       <NewDMModal
         isOpen={dmModalOpen}
         onClose={() => setDmModalOpen(false)}
-        onConversationCreated={fetchConversations}
+        onCreated={(newConv) => {
+          setConversations((prev) => [newConv, ...prev.filter(c => c.id !== newConv.id)]);
+          navigate(`/dms/${newConv.id}`);
+        }}
       />
+
       <CreateGroupModal
         isOpen={groupModalOpen}
         onClose={() => setGroupModalOpen(false)}
-        onGroupCreated={fetchConversations}
+        onCreated={(newGroup) => {
+          setConversations((prev) => [newGroup, ...prev.filter(c => c.id !== newGroup.id)]);
+          navigate(`/channels/${newGroup.id}`);
+        }}
       />
-      <GroupSettingsModal
-        isOpen={!!activeGroupSettings}
-        onClose={() => setActiveGroupSettings(null)}
-        conversation={activeGroupSettings}
-        onUpdated={fetchConversations}
-      />
+
+      {activeGroupSettings && (
+        <GroupSettingsModal
+          isOpen={!!activeGroupSettings}
+          onClose={() => setActiveGroupSettings(null)}
+          conversation={activeGroupSettings}
+          currentUser={user}
+          onUpdated={(updatedConv) => {
+            setConversations((prev) => prev.map(c => c.id === updatedConv.id ? updatedConv : c));
+          }}
+        />
+      )}
     </div>
   );
 }
