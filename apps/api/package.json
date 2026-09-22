@@ -8,7 +8,11 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "build": "echo \"API build complete\"",
+    "db:seed": "node prisma/seed.js",
     "test": "vitest run --fileParallelism false"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

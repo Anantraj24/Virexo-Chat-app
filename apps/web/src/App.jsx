@@ -16,6 +16,8 @@ const DirectMessagePage = lazy(() => import('./pages/DirectMessagePage').then(mo
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(module => ({ default: module.SettingsPage })));
 const ConversationListPage = lazy(() => import('./pages/ConversationListPage').then(module => ({ default: module.ConversationListPage })));
 
+const EditorialHero = lazy(() => import('./components/landing/EditorialHero').then(module => ({ default: module.EditorialHero })));
+
 const LoginPage = lazy(() => import('./pages/LoginPage').then(module => ({ default: module.LoginPage })));
 const RegisterPage = lazy(() => import('./pages/RegisterPage').then(module => ({ default: module.RegisterPage })));
 const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage').then(module => ({ default: module.VerifyEmailPage })));
@@ -102,8 +104,10 @@ export default function App() {
                     <Route path="admin" element={<AdminDashboard />} />
                   </Route>
 
-                  {/* Public Authentication Layout (Guest Only for login/register) */}
+                  {/* Public Authentication & Landing Layout */}
                   <Route element={<PublicLayout />}>
+                    <Route path="landing" element={<EditorialHero />} />
+                    <Route path="welcome" element={<EditorialHero />} />
                     <Route
                       path="login"
                       element={

@@ -98,10 +98,10 @@ export function ConversationList({ conversations, currentUserId, loading, search
                   to={`/dms/${dm.id}`}
                   className={({ isActive }) =>
                     cn(
-                      'flex items-center space-x-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition',
+                      'flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-150',
                       isActive
-                        ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
-                        : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'
+                        ? 'bg-[#2a3942] text-white border-l-4 border-[#00a884]'
+                        : 'text-zinc-300 hover:bg-[#202c33]'
                     )
                   }
                 >
@@ -111,11 +111,11 @@ export function ConversationList({ conversations, currentUserId, loading, search
                     size="sm"
                     status={recipient.status}
                   />
-                  <span className="truncate flex-1">
+                  <span className="truncate flex-1 font-normal text-zinc-200">
                     {recipient.displayName || recipient.username}
                   </span>
                   {unread > 0 && (
-                    <span className="flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-indigo-600 rounded-full shrink-0">
+                    <span className="flex items-center justify-center min-w-5 h-5 px-1.5 text-[10px] font-bold text-white bg-[#00a884] rounded-full shrink-0 shadow-sm">
                       {unread > 99 ? '99+' : unread}
                     </span>
                   )}

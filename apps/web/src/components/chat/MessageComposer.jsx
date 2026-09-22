@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Send, XCircle, RotateCcw, ArrowLeft, Edit2, Paperclip, FileText, Image as ImageIcon, Film, Mic, Square, Trash2 } from 'lucide-react';
-import { Button } from '../ui/Button';
+import { Send, XCircle, RotateCcw, ArrowLeft, Edit2, Paperclip, FileText, Image as ImageIcon, Film, Mic, Square, Trash2, Smile } from 'lucide-react';
 
 export function MessageComposer({
   inputText,
@@ -43,7 +42,7 @@ export function MessageComposer({
       onInputChange({ target: { value: editingMessage.content } });
       inputRef.current?.focus();
     }
-  }, [editingMessage]); // Only run when editingMessage changes
+  }, [editingMessage]);
 
   const handleRetry = useCallback((idempotencyKey) => {
     onRetryFailed(idempotencyKey);
@@ -74,13 +73,11 @@ export function MessageComposer({
 
       mediaRecorder.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        // Don't auto-upload if canceled
         if (audioChunksRef.current.length > 0) {
           const file = new File([audioBlob], `voice-note-${Date.now()}.webm`, { type: 'audio/webm' });
           uploadAttachment(file);
         }
         
-        // Stop all tracks
         stream.getTracks().forEach((track) => track.stop());
         setIsRecording(false);
         setRecordingDuration(0);
@@ -96,7 +93,6 @@ export function MessageComposer({
       }, 1000);
     } catch (err) {
       console.error('Microphone access denied or error:', err);
-      // Could show toast here if we pass addToast down
     }
   };
 
@@ -108,7 +104,7 @@ export function MessageComposer({
 
   const cancelRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      audioChunksRef.current = []; // Clear chunks so onstop won't upload
+      audioChunksRef.current = [];
       mediaRecorderRef.current.stop();
     }
   };
@@ -130,10 +126,10 @@ export function MessageComposer({
   };
 
   return (
-    <div className="pt-3 border-t border-zinc-800/80 mt-2 shrink-0">
+    <div className="pt-2.5 pb-2.5 px-4 bg-[#202c33] dark:bg-[#202c33] border-t border-zinc-800/60 shrink-0">
       {replyingTo && !editingMessage && (
-        <div className="flex items-center justify-between px-2 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-lg mb-2">
-          <div className="flex items-center space-x-2 text-xs text-indigo-400">
+        <div className="flex items-center justify-between px-3 py-1.5 bg-[#111b21] border-l-4 border-[#00a884] rounded-lg mb-2">
+          <div className="flex items-center space-x-2 text-xs text-[#00a884]">
             <ArrowLeft className="w-3.5 h-3.5" />
             {(() => {
               const replySender = replyingTo.sender || (typeof replyingTo.senderId === 'object' ? replyingTo.senderId : null);
@@ -143,7 +139,7 @@ export function MessageComposer({
           <button
             type="button"
             onClick={onCancelReply}
-            className="text-zinc-500 hover:text-white p-0.5 transition cursor-pointer"
+            className="text-zinc-400 hover:text-white p-0.5 transition cursor-pointer"
           >
             <XCircle className="w-3.5 h-3.5" />
           </button>
@@ -151,8 +147,8 @@ export function MessageComposer({
       )}
 
       {editingMessage && (
-        <div className="flex items-center justify-between px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg mb-2">
-          <div className="flex items-center space-x-2 text-xs text-zinc-300">
+        <div className="flex items-center justify-between px-3 py-1.5 bg-[#111b21] border-l-4 border-amber-400 rounded-lg mb-2">
+          <div className="flex items-center space-x-2 text-xs text-amber-300">
             <Edit2 className="w-3.5 h-3.5" />
             <span>Editing message</span>
           </div>
@@ -162,7 +158,7 @@ export function MessageComposer({
               onCancelEdit();
               onInputChange({ target: { value: '' } });
             }}
-            className="text-zinc-500 hover:text-white p-0.5 transition cursor-pointer"
+            className="text-zinc-400 hover:text-white p-0.5 transition cursor-pointer"
           >
             <XCircle className="w-3.5 h-3.5" />
           </button>
@@ -186,12 +182,6 @@ export function MessageComposer({
               >
                 <RotateCcw className="w-3 h-3" />
               </button>
-              <button
-                className="text-zinc-500 hover:text-zinc-300 p-0.5 transition cursor-pointer"
-                title="Dismiss"
-              >
-                <XCircle className="w-3 h-3" />
-              </button>
             </div>
           ))}
         </div>
@@ -200,34 +190,28 @@ export function MessageComposer({
       {pendingAttachments.length > 0 && (
         <div className="flex flex-wrap gap-2 px-2 py-2 border-b border-zinc-800/40 mb-2">
           {pendingAttachments.map((att) => (
-            <div key={att.clientId} className="relative group w-16 h-16 bg-zinc-800 rounded-lg overflow-hidden border border-zinc-700 flex items-center justify-center">
+            <div key={att.clientId} className="relative group w-16 h-16 bg-[#111b21] rounded-lg overflow-hidden border border-zinc-700 flex items-center justify-center">
               {att.file.type.startsWith('image/') ? (
-                <ImageIcon className="w-6 h-6 text-zinc-500" /> // Could generate a local preview URL here for better UX
+                <ImageIcon className="w-6 h-6 text-zinc-400" />
               ) : att.file.type.startsWith('video/') ? (
-                <Film className="w-6 h-6 text-zinc-500" />
+                <Film className="w-6 h-6 text-zinc-400" />
               ) : (
-                <FileText className="w-6 h-6 text-zinc-500" />
+                <FileText className="w-6 h-6 text-zinc-400" />
               )}
               
               {att.uploading && (
-                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center">
+                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
                   <div className="text-[10px] text-white font-medium">{att.progress}%</div>
                   <div className="w-3/4 h-1 bg-zinc-700 rounded-full mt-1 overflow-hidden">
-                    <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${att.progress}%` }} />
+                    <div className="h-full bg-[#00a884] transition-all duration-300" style={{ width: `${att.progress}%` }} />
                   </div>
-                </div>
-              )}
-
-              {att.error && (
-                <div className="absolute inset-0 bg-red-500/20 flex flex-col items-center justify-center text-[10px] text-red-200 text-center leading-tight p-1">
-                  Error
                 </div>
               )}
 
               <button
                 type="button"
                 onClick={() => removePendingAttachment(att.clientId)}
-                className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 text-zinc-300 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 text-zinc-300 hover:text-white"
               >
                 <XCircle className="w-3.5 h-3.5" />
               </button>
@@ -239,21 +223,21 @@ export function MessageComposer({
       <form onSubmit={handleSubmit} className="flex items-center space-x-2">
         <button
           type="button"
+          className="p-2 text-zinc-400 hover:text-zinc-200 rounded-full transition cursor-pointer"
+          title="Emojis"
+        >
+          <Smile className="w-5 h-5" />
+        </button>
+
+        <button
+          type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={sending || disabled || editingMessage}
-          className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-full transition disabled:opacity-50"
+          className="p-2 text-zinc-400 hover:text-zinc-200 rounded-full transition disabled:opacity-50 cursor-pointer"
           title="Attach file"
         >
           <Paperclip className="w-5 h-5" />
         </button>
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          multiple
-          className="hidden"
-          accept="image/*,video/*,application/pdf,.doc,.docx"
-        />
         
         <input
           type="file"
@@ -263,7 +247,7 @@ export function MessageComposer({
           className="hidden"
           accept="image/*,video/*,application/pdf,.doc,.docx"
         />
-        
+
         {!isRecording ? (
           <>
             <input
@@ -273,32 +257,34 @@ export function MessageComposer({
               onChange={onInputChange}
               disabled={sending || disabled}
               placeholder={placeholder}
-              className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+              className="flex-1 bg-[#2a3942] border-none rounded-2xl px-4 py-2.5 text-xs text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-[#00a884] disabled:opacity-50"
             />
+            
             {!inputText.trim() && !editingMessage && (
               <button
                 type="button"
                 onClick={startRecording}
                 disabled={sending || disabled}
-                className="p-2 text-zinc-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-full transition disabled:opacity-50"
+                className="p-2.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-full transition disabled:opacity-50 cursor-pointer"
                 title="Record voice note"
               >
                 <Mic className="w-5 h-5" />
               </button>
             )}
-            <Button
-              type="submit"
-              variant="primary"
-              size="md"
-              isDisabled={(!inputText.trim() && pendingAttachments.length === 0) || sending || disabled}
-              isLoading={sending}
-              leftIcon={<Send className="w-4 h-4" />}
-            >
-              {editingMessage ? 'Save' : 'Send'}
-            </Button>
+
+            {(inputText.trim() || pendingAttachments.length > 0 || editingMessage) && (
+              <button
+                type="submit"
+                disabled={sending || disabled}
+                className="p-2.5 bg-[#00a884] hover:bg-[#008f70] text-white rounded-full transition-all duration-200 flex items-center justify-center shadow-md cursor-pointer disabled:opacity-50"
+                title={editingMessage ? 'Save Edit' : 'Send Message'}
+              >
+                <Send className="w-4 h-4 ml-0.5" />
+              </button>
+            )}
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-between bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-2">
+          <div className="flex-1 flex items-center justify-between bg-[#111b21] border border-red-500/30 rounded-2xl px-4 py-2">
             <div className="flex items-center space-x-3 text-red-400">
               <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               <span className="text-xs font-medium font-mono">{formatDuration(recordingDuration)}</span>
@@ -307,7 +293,7 @@ export function MessageComposer({
               <button
                 type="button"
                 onClick={cancelRecording}
-                className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-500/20 rounded-full transition"
+                className="p-1.5 text-zinc-400 hover:text-red-400 rounded-full transition"
                 title="Cancel"
               >
                 <Trash2 className="w-4 h-4" />

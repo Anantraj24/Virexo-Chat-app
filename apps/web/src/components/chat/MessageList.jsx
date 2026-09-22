@@ -106,84 +106,97 @@ const MessageAttachment = memo(({ attachment }) => {
 
 MessageAttachment.displayName = 'MessageAttachment';
 
-const MessageItem = memo(({ message, isSelf, formatTime, currentUser, allMessages, onEdit, onDelete, onDeleteForEveryone, onReply, onPin, onUnpin, onReaction, onForward, onReport }) => {
+const MessageItem = memo(({
+  message,
+  isSelf,
+  formatTime,
+  currentUser,
+  allMessages,
+  onEdit,
+  onDelete,
+  onDeleteForEveryone,
+  onReply,
+  onPin,
+  onUnpin,
+  onReaction,
+  onForward,
+  onReport,
+}) => {
   const sender = message.sender || (typeof message.senderId === 'object' ? message.senderId : null) || { username: 'Unknown', displayName: 'Unknown' };
-  const showAvatar = !isSelf;
-  const timeStr = message.createdAt ? formatTime(message.createdAt) : '';
+  const timeStr = formatTime(message.createdAt);
   const replyPreview = formatReplyPreview(message, allMessages);
-  const reactions = message.reactions || [];
-  const reactionSummary = reactions.length > 0 ? reactions : [];
+
+  const reactionSummary = useMemo(() => {
+    if (!message.reactions || !Array.isArray(message.reactions)) return [];
+    const counts = {};
+    message.reactions.forEach((r) => {
+      counts[r.emoji] = (counts[r.emoji] || 0) + 1;
+    });
+    return Object.entries(counts).map(([emoji, count]) => ({ emoji, count }));
+  }, [message.reactions]);
 
   return (
     <div
-      id={`message-${message.id}`}
       className={cn(
-        'group flex items-start space-x-3 p-2 rounded-xl hover:bg-zinc-900/50 transition',
-        isSelf && 'flex-row-reverse space-x-reverse'
+        'group flex items-start my-1.5 px-2 sm:px-4',
+        isSelf ? 'justify-end' : 'justify-start'
       )}
     >
-      {showAvatar && (
-        <div className="shrink-0 pt-1">
-          <Avatar
-            name={sender.displayName || sender.username}
-            src={sender.avatarUrl}
-            size="sm"
-          />
-        </div>
-      )}
-
-      <div className={cn('min-w-0 flex-1', isSelf && 'text-right')}>
+      <div
+        className={cn(
+          'max-w-[85%] sm:max-w-[70%] rounded-2xl px-3 py-2 shadow-sm text-xs relative select-text',
+          isSelf ? 'wa-bubble-sent text-white' : 'wa-bubble-received text-zinc-100'
+        )}
+      >
         {!isSelf && (
-          <span className="text-xs font-bold text-zinc-100 block">
+          <span className="text-[11px] font-bold text-emerald-400 block mb-0.5">
             {sender.displayName || sender.username}
           </span>
         )}
 
         {replyPreview && (
-          <div className={cn(
-            'text-[10px] px-2 py-1 rounded-lg border mb-1',
-            isSelf ? 'border-zinc-700 bg-zinc-800/50 text-zinc-400' : 'border-indigo-500/30 bg-indigo-500/10 text-indigo-400'
-          )}>
-            <span className="font-semibold">{replyPreview.senderName}</span>
-            <span className="mx-1">{replyPreview.content}</span>
+          <div className="text-[11px] px-2.5 py-1.5 rounded-r-lg border-l-4 border-[#00a884] bg-black/25 mb-1.5">
+            <span className="font-bold text-[#00a884] block">{replyPreview.senderName}</span>
+            <span className="text-zinc-300 line-clamp-1">{replyPreview.content}</span>
           </div>
         )}
 
-        <div className={cn('flex items-center space-x-2 mt-0.5', isSelf && 'flex-row-reverse')}>
-          <div className="flex flex-col">
-            {message.content && (
-              <span
-                className={cn(
-                  'text-xs leading-relaxed',
-                  message.isDeleted ? 'italic text-zinc-500' : 'text-zinc-300'
-                )}
-              >
-                {message.content}
-              </span>
-            )}
-            
-            {!message.isDeleted && message.attachments?.map((att, idx) => (
-              <MessageAttachment key={idx} attachment={att} />
-            ))}
-          </div>
-
-          {message.isEdited && (
-            <span className="text-[10px] text-zinc-600" title="Edited">(edited)</span>
+        <div className="pr-12 leading-relaxed break-words">
+          {message.content && (
+            <span className={cn(message.isDeleted && 'italic text-zinc-400')}>
+              {message.content}
+            </span>
           )}
+
+          {!message.isDeleted && message.attachments?.map((att, idx) => (
+            <MessageAttachment key={idx} attachment={att} />
+          ))}
+        </div>
+
+        {/* Bottom Right WhatsApp Timestamp & Checkmark Badge */}
+        <div className="absolute right-2 bottom-1.5 flex items-center space-x-1 select-none pointer-events-none">
+          {message.isEdited && (
+            <span className="text-[10px] text-zinc-400/80 mr-0.5">(edited)</span>
+          )}
+          <span className="text-[10px] text-zinc-400 tracking-tighter">{timeStr}</span>
           {isSelf && !message.isDeleted && (
             <MessageStatus status={message.status || 'sent'} />
           )}
-          {!isSelf && (
-            <span className="text-[10px] text-zinc-500">{timeStr}</span>
-          )}
           {message.isPinned && (
-            <span className="text-[10px] text-amber-400 shrink-0" title="Pinned">📌</span>
+            <span className="text-[10px] text-amber-400 ml-0.5">📌</span>
           )}
-          {reactionSummary.length > 0 && (
-            <span className="text-[10px] text-zinc-500 shrink-0">
-              {reactionSummary.map((r) => r.emoji).join(' ')}
-            </span>
-          )}
+        </div>
+
+        {reactionSummary.length > 0 && (
+          <div className="absolute -bottom-2 right-4 bg-zinc-900/90 border border-zinc-800 rounded-full px-1.5 py-0.5 text-[10px] shadow-md flex items-center space-x-0.5">
+            {reactionSummary.map((r) => (
+              <span key={r.emoji}>{r.emoji}</span>
+            ))}
+          </div>
+        )}
+
+        {/* Hover Menu Overlay */}
+        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
           <MessageActionMenu
             message={message}
             currentUser={currentUser}
@@ -275,7 +288,7 @@ export function MessageList({
       </div>
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto space-y-1 p-2"
+        className="flex-1 overflow-y-auto space-y-1 p-3 whatsapp-wallpaper"
         role="log"
         aria-label="Message history"
       >

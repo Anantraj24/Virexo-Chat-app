@@ -1,7 +1,7 @@
 # Virexo Build Status & Progress Tracker
 
-- **Current Phase**: **Phase 20B - Chat UI Error Fixes & Model Parity**
-- **Overall Status**: Unhandled UI errors caught during chatting fixed; Prisma sender/member relations normalized across frontend & backend.
+- **Current Phase**: **Phase 23 - WhatsApp Web UI/UX Redesign**
+- **Overall Status**: WhatsApp Web design system, doodle wallpaper, double checkmarks (#53bdeb), speech bubble tails, and composer controls fully implemented.
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -188,3 +188,24 @@
 - [x] Fixed safe reaction Array handling and `r.userId` string/object normalization in `useChat` hook to prevent React crashes.
 - [x] Updated Prisma `MessageAudit` updates to `upsert` in `messageController.js` to prevent database record missing errors on message edits and deletions.
 - [x] All 114 test suites across backend and frontend passing clean.
+
+### Phase 21: Editorial Front Page UI/UX Redesign
+- [x] Redesigned public landing experience inspired by high-end editorial dark aesthetics (`EditorialHero.jsx`).
+- [x] Added custom CSS keyframes (`spinSlow`, `spinReverseSlow`, `floatGentle`, `pulseGlow`) and warm sunset text gradient utilities in `index.css`.
+- [x] Implemented dual interactive SVG rotating orbital rings, surreal floating badges, and dynamic date stamp.
+- [x] Configured gold wireframe CTAs (`gold-wireframe-btn`) with smooth hover sheen and accessibility contrast.
+- [x] Verified build compilation and clean bundle asset output via `npm run build -w apps/web`.
+
+### Permanent Accounts & Seed Setup
+- [x] Created permanent user account `anant` (Password: `anant123`, Email: `anant@virexo.com`).
+- [x] Created permanent user account `shubham` (Password: `shubham123`, Email: `shubham@virexo.com`).
+- [x] Pre-established Direct Message conversation between `anant` and `shubham`.
+- [x] Added Prisma seed script (`apps/api/prisma/seed.js`) and registered `npm run db:seed` in `apps/api/package.json`.
+
+### Phase 23: WhatsApp Web UI/UX Redesign
+- [x] Implemented WhatsApp Web design system color tokens (`--wa-bg-dark: #0b141a`, `--wa-sent-dark: #005c4b`, `--wa-received-dark: #202c33`, `--wa-teal: #00a884`, `--wa-read-blue: #53bdeb`).
+- [x] Created WhatsApp doodle wallpaper background class (`.whatsapp-wallpaper`) and speech bubble tail corners (`.wa-bubble-sent`, `.wa-bubble-received`).
+- [x] Enhanced checkmarks in `MessageStatus.jsx` with WhatsApp double checkmark SVG icons and `#53bdeb` blue read status indicators.
+- [x] Redesigned `MessageList.jsx` with speech bubble tails, bottom-right inline timestamp + checkmark badges, and vertical green accent reply cards.
+- [x] Redesigned `MessageComposer.jsx` with emoji picker icon, attachment clip button, pill-shaped text input (`#2a3942`), and circular emerald green send button (`#00a884`).
+- [x] Redesigned `ConversationList.jsx` with WhatsApp active conversation highlights (`#2a3942`) and emerald unread badge counters (`#00a884`).

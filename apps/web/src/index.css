@@ -41,6 +41,149 @@
   background: #3f3f46;
 }
 
+/* Editorial Keyframe Animations */
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spinReverseSlow {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes floatGentle {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(3deg); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+.animate-orbit-slow {
+  animation: spinSlow 28s linear infinite;
+  transform-origin: center;
+}
+
+.animate-orbit-reverse {
+  animation: spinReverseSlow 34s linear infinite;
+  transform-origin: center;
+}
+
+.animate-float-gentle {
+  animation: floatGentle 7s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 4s ease-in-out infinite;
+}
+
+/* Editorial Styling & Gradients */
+.bg-matte-editorial {
+  background: radial-gradient(circle at 60% 40%, #252328 0%, #151417 65%, #0e0d0f 100%);
+}
+
+.text-gradient-sunset {
+  background: linear-gradient(135deg, #d4f8d3 0%, #f7d794 45%, #f8a5c2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gold-wireframe-btn {
+  border: 1px solid rgba(247, 215, 148, 0.45);
+  color: #f7d794;
+  letter-spacing: 0.12em;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.gold-wireframe-btn:hover {
+  border-color: #f7d794;
+  background-color: rgba(247, 215, 148, 0.08);
+  box-shadow: 0 0 20px rgba(247, 215, 148, 0.2);
+  color: #ffffff;
+}
+
+/* WhatsApp Web Theme Tokens & Doodle Wallpaper */
+:root {
+  --wa-bg-dark: #0b141a;
+  --wa-sidebar-header: #202c33;
+  --wa-sidebar-bg: #111b21;
+  --wa-chat-bg: #0b141a;
+  --wa-sent-dark: #005c4b;
+  --wa-received-dark: #202c33;
+  --wa-active-item: #2a3942;
+  --wa-input-bg: #2a3942;
+  --wa-teal: #00a884;
+  --wa-read-blue: #53bdeb;
+}
+
+.whatsapp-wallpaper {
+  background-color: var(--wa-chat-bg);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+.light .whatsapp-wallpaper {
+  background-color: #efeae2;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+/* WhatsApp Speech Bubble Tails */
+.wa-bubble-sent {
+  position: relative;
+  background-color: var(--wa-sent-dark);
+  border-top-right-radius: 0 !important;
+}
+
+.wa-bubble-sent::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -8px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid var(--wa-sent-dark);
+  border-right: 8px solid transparent;
+}
+
+.light .wa-bubble-sent {
+  background-color: #d9fdd3;
+  color: #111b21;
+}
+
+.light .wa-bubble-sent::after {
+  border-top-color: #d9fdd3;
+}
+
+.wa-bubble-received {
+  position: relative;
+  background-color: var(--wa-received-dark);
+  border-top-left-radius: 0 !important;
+}
+
+.wa-bubble-received::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -8px;
+  width: 0;
+  height: 0;
+  border-top: 8px solid var(--wa-received-dark);
+  border-left: 8px solid transparent;
+}
+
+.light .wa-bubble-received {
+  background-color: #ffffff;
+  color: #111b21;
+}
+
+.light .wa-bubble-received::before {
+  border-top-color: #ffffff;
+}
+
 /* Reduced Motion Compliance */
 @media (prefers-reduced-motion: reduce) {
   *,
