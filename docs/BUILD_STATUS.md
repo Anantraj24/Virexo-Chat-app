@@ -234,3 +234,11 @@
 - [x] Fortified notification trigger dispatch with isolated error boundary so notification dispatch side effects never interrupt message delivery or reaction flows.
 - [x] Successfully verified full test suite: 188/188 tests passing cleanly across monorepo (125 API + 63 Web) with 0 failures.
 
+### Phase 27: Firebase Project & Web App Integration
+- [x] Created dedicated Firebase project `virexo-chat-app` (Project Number: `53907129704`).
+- [x] Registered Web App `Virexo Web` with App ID `1:53907129704:web:351e805dde43d3bb2742dd`.
+- [x] Configured `.firebaserc` and `firebase.json` for SPA hosting with rewrite rules to `apps/web/dist`.
+- [x] Added `apps/web/src/config/firebase.js` with client SDK parameters and env fallbacks.
+- [x] Verified clean production build compilation.
+
+
