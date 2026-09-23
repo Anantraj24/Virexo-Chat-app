@@ -30,10 +30,7 @@ afterAll(async () => {
   if (httpServer && httpServer.listening) {
     await new Promise((resolve) => httpServer.close(resolve));
   }
-  await mongoose.disconnect();
-  if (mongoServer) {
-    await mongoServer.stop();
-  }
+  await teardownTestDB();
 });
 
 beforeEach(async () => {

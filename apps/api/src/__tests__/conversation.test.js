@@ -59,7 +59,7 @@ describe('Conversation Domain API Integration Tests', () => {
     expect(res2.body.data.isExisting).toBe(true);
 
     // Verify DB count is strictly 1
-    const count = await Conversation.countDocuments();
+    const count = await prisma.conversation.count();
     expect(count).toBe(1);
   });
 

@@ -72,10 +72,10 @@ describe('Message Operations API', () => {
       expect(res.body.data.message.content).toBe('Edited message');
       expect(res.body.data.message.isEdited).toBe(true);
 
-      const dbMessage = await prisma.message.findUnique({ where: { id: message.id } });
+      const dbMessage = await prisma.message.findUnique({ where: { id: message.id }, include: { audit: true } });
       expect(dbMessage.content).toBe('Edited message');
       expect(dbMessage.isEdited).toBe(true);
-      expect(dbMessage.audit.editedBy.toString()).toBe(user1.id.toString());
+      expect(dbMessage.audit.editedById).toBe(user1.id);
     });
 
     it('should fail to edit message if requested by non-sender', async () => {
@@ -107,9 +107,9 @@ describe('Message Operations API', () => {
 
       expect(res.status).toBe(200);
 
-      const dbMessage = await prisma.message.findUnique({ where: { id: message.id } });
+      const dbMessage = await prisma.message.findUnique({ where: { id: message.id }, include: { audit: true } });
       expect(dbMessage.isDeleted).toBe(true);
-      expect(dbMessage.audit.deletedBy.toString()).toBe(user1.id.toString());
+      expect(dbMessage.audit.deletedById).toBe(user1.id);
       expect(dbMessage.audit.deletionScope).toBe('self');
     });
 
@@ -144,7 +144,7 @@ describe('Message Operations API', () => {
         .set('Authorization', `Bearer ${token1}`);
 
       expect(res.status).toBe(200);
-      const dbMessage = await prisma.message.findUnique({ where: { id: message.id } });
+      const dbMessage = await prisma.message.findUnique({ where: { id: message.id }, include: { audit: true } });
       expect(dbMessage.isDeleted).toBe(true);
       expect(dbMessage.content).toBe('[This message was deleted]');
       expect(dbMessage.audit.deletionScope).toBe('everyone');

@@ -11,6 +11,28 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      let res;
+      if (activeTab === 'users') {
+        res = await adminApi.getUsers();
+        setData(res.data?.users || []);
+      } else if (activeTab === 'reports') {
+        res = await adminApi.getReports();
+        setData(res.data?.reports || []);
+      } else if (activeTab === 'logs') {
+        res = await adminApi.getAuditLogs();
+        setData(res.data?.logs || []);
+      }
+    } catch (err) {
+      setError(err.response?.data?.error?.message || err.message || 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (user && user.role === 'admin') {
       fetchData();

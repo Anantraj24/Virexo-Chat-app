@@ -34,10 +34,14 @@ export const signupRules = [
 ];
 
 export const loginRules = [
-  body('identifier')
-    .trim()
-    .notEmpty()
-    .withMessage('Username or email is required'),
+  body().custom((value, { req }) => {
+    const id = req.body?.identifier || req.body?.email || req.body?.username;
+    if (!id || typeof id !== 'string' || !id.trim()) {
+      throw new Error('Username or email is required');
+    }
+    req.body.identifier = id.trim();
+    return true;
+  }),
   body('password')
     .notEmpty()
     .withMessage('Password is required'),

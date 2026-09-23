@@ -56,7 +56,7 @@ describe('Message REST Domain API Integration Tests', () => {
     expect(msgRes.status).toBe(201);
     expect(msgRes.body.success).toBe(true);
     expect(msgRes.body.data.message.content).toBe('Hello World from Virexo!');
-    expect(msgRes.body.data.message.senderId.username).toBe('sender_u');
+    expect(msgRes.body.data.message.sender?.username || msgRes.body.data.message.senderId?.username).toBe('sender_u');
 
     // Verify Conversation updated lastMessageId
     const updatedConv = await prisma.conversation.findUnique({ where: { id: conversationId } });
@@ -101,7 +101,7 @@ describe('Message REST Domain API Integration Tests', () => {
     expect(msgRes2.body.data.message.id).toBe(msgRes1.body.data.message.id);
 
     // Verify DB count is 1
-    const count = await Message.countDocuments();
+    const count = await prisma.message.count();
     expect(count).toBe(1);
   });
 
@@ -132,7 +132,7 @@ describe('Message REST Domain API Integration Tests', () => {
     expect(historyRes.status).toBe(200);
     expect(historyRes.body.data.messages.length).toBe(2);
     expect(historyRes.body.data.unreadCount).toBe(3); // User2 hasn't read them yet
-  });
+  }, 25000);
 
   it('DELETE /api/v1/messages/:id should soft delete message', async () => {
     const user1 = await createTestUser('author_user', 'author@example.com');

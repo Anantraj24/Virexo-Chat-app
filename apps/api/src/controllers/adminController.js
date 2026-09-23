@@ -128,7 +128,9 @@ export const updateUserStatus = async (req, res, next) => {
         const io = getIO();
         io.to(`user:${id}`).emit('force:logout', { reason: 'ACCOUNT_SUSPENDED' });
         io.in(`user:${id}`).disconnectSockets(true);
-      } catch (err) {}
+      } catch {
+        // Socket server may not be initialized in test mode
+      }
     }
 
     await logAdminAction(currentUserId, accountStatus === 'suspended' ? 'SUSPEND_USER' : 'RESTORE_USER', 'User', id, { previousStatus });

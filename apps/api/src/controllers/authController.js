@@ -124,7 +124,9 @@ export async function signup(req, res, next) {
 // Login Controller
 export async function login(req, res, next) {
   try {
-    const { identifier, password, rememberMe = true } = req.body;
+    const { password, rememberMe = true } = req.body;
+    const rawId = req.body.identifier || req.body.email || req.body.username || '';
+    const identifier = rawId.trim();
 
     const user = await prisma.user.findFirst({
       where: {

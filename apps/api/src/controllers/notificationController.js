@@ -92,7 +92,9 @@ export const markAsRead = async (req, res, next) => {
       io.to(`user:${currentUserId}`).emit(SOCKET_EVENTS.NOTIFICATION_READ, {
         notificationId: notification.id,
       });
-    } catch (err) {}
+    } catch {
+      // Socket server may not be running in tests
+    }
 
     res.status(200).json(createApiResponse(true, { notification }));
   } catch (error) {
@@ -114,7 +116,9 @@ export const markAllAsRead = async (req, res, next) => {
       io.to(`user:${currentUserId}`).emit(SOCKET_EVENTS.NOTIFICATION_READ, {
         all: true,
       });
-    } catch (err) {}
+    } catch {
+      // Socket server may not be running in tests
+    }
 
     res.status(200).json(createApiResponse(true, { message: 'All notifications marked as read' }));
   } catch (error) {
@@ -131,48 +135,53 @@ export const triggerNotification = async ({
   entityModel,
   content,
 }) => {
-  if (recipientId === actorId) return; // Don't notify self
-
-  // Check for duplicate unread notification of the same type/entity/actor
-  const existing = await prisma.notification.findFirst({
-    where: {
-      recipientId,
-      actorId,
-      type,
-      entityId,
-      isRead: false,
-    }
-  });
-
-  if (existing) {
-    // Already an unread notification for this, skip creating duplicate to prevent spam
-    return existing;
-  }
-
-  const notification = await prisma.notification.create({
-    data: {
-      recipientId,
-      actorId,
-      type,
-      entityId,
-      entityModel,
-      content,
-    },
-    include: {
-      actor: {
-        select: { id: true, username: true, displayName: true, avatarUrl: true, status: true, lastSeen: true }
-      }
-    }
-  });
+  if (!recipientId || !actorId || recipientId === actorId) return null;
 
   try {
-    const io = getIO();
-    io.to(`user:${recipientId}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW, {
-      notification,
+    // Check for duplicate unread notification of the same type/entity/actor
+    const existing = await prisma.notification.findFirst({
+      where: {
+        recipientId,
+        actorId,
+        type,
+        entityId,
+        isRead: false,
+      }
     });
-  } catch (error) {
-    // Ignore in tests if socket server is not started
-  }
 
-  return notification;
+    if (existing) {
+      // Already an unread notification for this, skip creating duplicate to prevent spam
+      return existing;
+    }
+
+    const notification = await prisma.notification.create({
+      data: {
+        recipientId,
+        actorId,
+        type,
+        entityId,
+        entityModel,
+        content,
+      },
+      include: {
+        actor: {
+          select: { id: true, username: true, displayName: true, avatarUrl: true, status: true, lastSeen: true }
+        }
+      }
+    });
+
+    try {
+      const io = getIO();
+      io.to(`user:${recipientId}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW, {
+        notification,
+      });
+    } catch {
+      // Ignore in tests if socket server is not started
+    }
+
+    return notification;
+  } catch {
+    // Fire-and-forget notification delivery should not crash core message or reaction operations
+    return null;
+  }
 };

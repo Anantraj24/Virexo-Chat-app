@@ -17,8 +17,8 @@ beforeEach(async () => {
 
 describe('User Profile & Settings API Integration Tests', () => {
   async function getAuthToken(prefix = 'jordan') {
-    const unique = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    const username = `${prefix}_${unique}`;
+    const unique = `${Date.now().toString().slice(-6)}_${Math.random().toString(36).slice(2, 6)}`;
+    const username = `${prefix.slice(0, 10)}_${unique}`;
     const email = `${username}@example.com`;
     const signupRes = await request(app).post('/api/v1/auth/signup').send({
       username,
