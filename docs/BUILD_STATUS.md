@@ -1,7 +1,7 @@
 # Virexo Build Status & Progress Tracker
 
-- **Current Phase**: **Phase 29 - Production API Deployment Blueprint & Multi-Origin Live Connection**
-- **Overall Status**: Multi-origin CORS support enabled for Firebase Hosting and local domains, production environment variables validated against Neon PostgreSQL, Render infrastructure blueprint created (`render.yaml`), and monorepo build with Prisma Client generation verified.
+- **Current Phase**: **Phase 30 - Session Lifecycle & Guest Auth UX Refinement**
+- **Overall Status**: Distinguishes unauthenticated guest visits from genuine expired sessions in Axios response interceptor, deployed to Firebase Hosting, and verified across monorepo tests.
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -39,6 +39,7 @@
 | **Phase 27** | **Firebase Project & Web App Integration** | Created Firebase project `virexo-chat-app`, Web App, config files, and client SDK integration. | **COMPLETE** |
 | **Phase 28** | **Firebase Hosting Deployment & Live Verification** | Deployed production Vite bundle to Firebase Hosting (`https://virexo-chat-app.web.app`), verified 200 OK. | **COMPLETE** |
 | **Phase 29** | **Production API Blueprint & Multi-Origin Connection** | Render IaC blueprint (`render.yaml`), multi-origin CORS & Socket.IO config, Neon Postgres env validation, cookie sameSite alignment. | **COMPLETE** |
+| **Phase 30** | **Session Lifecycle & Guest Auth UX Refinement** | Differentiated unauthenticated guest state from expired sessions, prevented misleading error toasts, redeployed to Firebase Hosting. | **COMPLETE** |
 
 ---
 
@@ -267,3 +268,10 @@
 - [x] Updated `apps/api/package.json` build script to run `prisma generate`.
 - [x] Created `apps/web/.env.production.example` pointing to production API service.
 - [x] Verified 188/188 monorepo tests passing (125 API + 63 Web) and clean production build.
+
+### Phase 30: Session Lifecycle & Guest Auth UX Refinement
+- [x] Identified root cause of premature "Session expired. Please log in again." prompt appearing on unauthenticated initial page loads.
+- [x] Refactored `apps/web/src/api/axiosClient.js` 401 interceptor catch handler to verify `wasAuthenticated` before emitting `SESSION_EXPIRED`.
+- [x] Verified login with credentials `anant` / `anant123` setting HttpOnly `refreshToken` cookie.
+- [x] Verified 63/63 web unit tests passing and 0 ESLint errors.
+- [x] Recompiled production distribution and redeployed to live Firebase Hosting (`https://virexo-chat-app.web.app`).

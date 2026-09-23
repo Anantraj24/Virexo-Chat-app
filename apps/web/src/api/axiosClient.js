@@ -95,12 +95,15 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError) {
         // Refresh failed — clear auth state and reject all queued
+        const wasAuthenticated = Boolean(useAuthStore.getState().user || useAuthStore.getState().accessToken);
         processQueue(refreshError, null);
         useAuthStore.getState().clearAuth();
 
         const customError = {
-          message: 'Session expired. Please log in again.',
-          code: 'SESSION_EXPIRED',
+          message: wasAuthenticated
+            ? 'Session expired. Please log in again.'
+            : 'Authentication required. Please sign in.',
+          code: wasAuthenticated ? 'SESSION_EXPIRED' : 'UNAUTHORIZED',
           status: 401,
           details: null,
         };
