@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "build": "echo \"API build complete\"",
+    "build": "prisma generate",
     "db:seed": "node prisma/seed.js",
     "test": "vitest run --fileParallelism false"
   },

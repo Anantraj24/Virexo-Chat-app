@@ -39,7 +39,7 @@ function clearRefreshTokenCookie(res) {
   res.clearCookie('refreshToken', {
     httpOnly: true,
     secure: env.isProduction,
-    sameSite: 'strict',
+    sameSite: env.isProduction ? 'none' : 'lax',
     path: '/api/v1/auth',
   });
 }

@@ -12,7 +12,7 @@
  */
 
 import { Server } from 'socket.io';
-import { env } from '../config/env.js';
+import { env, getAllowedOrigins } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { socketAuthMiddleware } from './socketAuth.js';
 import { setupSocketHandlers } from './socketHandler.js';
@@ -20,9 +20,17 @@ import { setupSocketHandlers } from './socketHandler.js';
 let io = null;
 
 export function initSocketServer(httpServer) {
+  const allowed = getAllowedOrigins();
+
   io = new Server(httpServer, {
     cors: {
-      origin: env.CLIENT_URL,
+      origin: (origin, callback) => {
+        if (!origin || env.isDevelopment || allowed.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
       credentials: true,
     },
     pingTimeout: 20000,

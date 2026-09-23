@@ -28,7 +28,7 @@ export const env = {
 };
 
 export function validateEnv() {
-  const requiredInProd = ['MONGODB_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'CLIENT_URL'];
+  const requiredInProd = ['DATABASE_URL', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'CLIENT_URL'];
   if (env.isProduction) {
     const missing = requiredInProd.filter((key) => !process.env[key]);
     if (missing.length > 0) {
@@ -38,4 +38,12 @@ export function validateEnv() {
       throw new Error('[Env Check Failed] BREVO_API_KEY is required when EMAIL_PROVIDER=brevo');
     }
   }
+}
+
+export function getAllowedOrigins() {
+  const origins = (env.CLIENT_URL || '')
+    .split(',')
+    .map((o) => o.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  return origins.length > 0 ? origins : ['http://localhost:5173'];
 }

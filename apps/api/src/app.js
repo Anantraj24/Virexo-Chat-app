@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { APP_NAME, APP_VERSION, createApiResponse } from '@virexo/shared';
-import { env, validateEnv } from './config/env.js';
+import { env, validateEnv, getAllowedOrigins } from './config/env.js';
 import { isDBConnected } from './config/db.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -37,9 +37,10 @@ app.use(
           return callback(null, true);
         }
       }
-      
-      // Fallback for production or specific origin
-      if (origin === env.CLIENT_URL || !origin) {
+
+      // Check allowed origins list (supports comma-separated list in CLIENT_URL)
+      const allowed = getAllowedOrigins();
+      if (!origin || allowed.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));

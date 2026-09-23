@@ -1,7 +1,7 @@
 # Virexo Build Status & Progress Tracker
 
-- **Current Phase**: **Phase 28 - Firebase Hosting Deployment & Live Verification**
-- **Overall Status**: Web application compiled, deployed live to Firebase Hosting (https://virexo-chat-app.web.app), and verified with 100% monorepo build and test compliance.
+- **Current Phase**: **Phase 29 - Production API Deployment Blueprint & Multi-Origin Live Connection**
+- **Overall Status**: Multi-origin CORS support enabled for Firebase Hosting and local domains, production environment variables validated against Neon PostgreSQL, Render infrastructure blueprint created (`render.yaml`), and monorepo build with Prisma Client generation verified.
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -38,6 +38,7 @@
 | **Phase 26** | **Auth & Messaging Reliability Analysis** | Dual-identifier backward compatibility, Prisma query parity in tests, isolated notification dispatch. | **COMPLETE** |
 | **Phase 27** | **Firebase Project & Web App Integration** | Created Firebase project `virexo-chat-app`, Web App, config files, and client SDK integration. | **COMPLETE** |
 | **Phase 28** | **Firebase Hosting Deployment & Live Verification** | Deployed production Vite bundle to Firebase Hosting (`https://virexo-chat-app.web.app`), verified 200 OK. | **COMPLETE** |
+| **Phase 29** | **Production API Blueprint & Multi-Origin Connection** | Render IaC blueprint (`render.yaml`), multi-origin CORS & Socket.IO config, Neon Postgres env validation, cookie sameSite alignment. | **COMPLETE** |
 
 ---
 
@@ -256,3 +257,13 @@
 - [x] Successfully deployed to Firebase Hosting via `npx firebase deploy --only hosting`.
 - [x] Verified live deployment status and 200 OK title response at `https://virexo-chat-app.web.app`.
 - [x] Validated monorepo lint and test compliance across workspaces.
+
+### Phase 29: Production API Blueprint & Multi-Origin Live Connection
+- [x] Corrected production environment validation in `apps/api/src/config/env.js` from deprecated `MONGODB_URI` to `DATABASE_URL`.
+- [x] Implemented `getAllowedOrigins()` utility supporting comma-separated `CLIENT_URL` values (e.g. Firebase Hosting and local dev).
+- [x] Configured Express CORS and Socket.IO server to support multi-origin callbacks against `getAllowedOrigins()`.
+- [x] Aligned `clearRefreshTokenCookie` with `setRefreshTokenCookie` using `sameSite: env.isProduction ? 'none' : 'lax'`.
+- [x] Configured root `render.yaml` Infrastructure-as-Code blueprint for automated Render Web Service deployment.
+- [x] Updated `apps/api/package.json` build script to run `prisma generate`.
+- [x] Created `apps/web/.env.production.example` pointing to production API service.
+- [x] Verified 188/188 monorepo tests passing (125 API + 63 Web) and clean production build.
