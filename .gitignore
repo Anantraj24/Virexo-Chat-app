@@ -40,3 +40,7 @@ coverage/
 /test-results/
 /playwright-report/
 /blob-report/
+
+# Firebase
+.firebase/
+

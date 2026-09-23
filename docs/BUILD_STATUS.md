@@ -1,7 +1,7 @@
 # Virexo Build Status & Progress Tracker
 
-- **Current Phase**: **Phase 23 - WhatsApp Web UI/UX Redesign**
-- **Overall Status**: WhatsApp Web design system, doodle wallpaper, double checkmarks (#53bdeb), speech bubble tails, and composer controls fully implemented.
+- **Current Phase**: **Phase 28 - Firebase Hosting Deployment & Live Verification**
+- **Overall Status**: Web application compiled, deployed live to Firebase Hosting (https://virexo-chat-app.web.app), and verified with 100% monorepo build and test compliance.
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -30,6 +30,14 @@
 | **Phase 18** | **Security & Reliability Audit** | Token rotation/reuse handling, CORS/cookies across Vercel/Render, NoSQL injection risks, XSS/unsafe rendering, rate limiting, duplicate message creation, and stale room membership | **COMPLETE** |
 | **Phase 19** | **Performance & Accessibility** | Route-level lazy loading, query cache policies, message list performance, image dimensions, Mongo query projections, keyboard navigation, semantic labels, contrast | **COMPLETE** |
 | **Phase 20A** | **PostgreSQL Migration** | Database engine migration from MongoDB to PostgreSQL using Prisma ORM. Replaces ObjectIds with cuid, rewrites all queries, and maps data to a relational schema. | **COMPLETE** |
+| **Phase 20B** | **Chat UI Error Fixes & Model Parity** | Normalized sender, reactions, and conversation member models across web client and API. | **COMPLETE** |
+| **Phase 21** | **Editorial Front Page UI/UX Redesign** | Editorial dark hero with orbital rings, gold wireframe buttons, and typography polish. | **COMPLETE** |
+| **Phase 23** | **WhatsApp Web UI/UX Redesign** | WhatsApp Web color tokens, doodle wallpaper, double checkmarks, and bubble tails. | **COMPLETE** |
+| **Phase 24** | **Username/Email Dual Auth & UI** | Dual identifier login validator, auth controller query, and WhatsApp-styled login page. | **COMPLETE** |
+| **Phase 25** | **Modern Multi-Column Omni-Channel UI** | Multi-column layout with icon dock, inbox folders, message list, chat view, contact sidebar. | **COMPLETE** |
+| **Phase 26** | **Auth & Messaging Reliability Analysis** | Dual-identifier backward compatibility, Prisma query parity in tests, isolated notification dispatch. | **COMPLETE** |
+| **Phase 27** | **Firebase Project & Web App Integration** | Created Firebase project `virexo-chat-app`, Web App, config files, and client SDK integration. | **COMPLETE** |
+| **Phase 28** | **Firebase Hosting Deployment & Live Verification** | Deployed production Vite bundle to Firebase Hosting (`https://virexo-chat-app.web.app`), verified 200 OK. | **COMPLETE** |
 
 ---
 
@@ -241,4 +249,10 @@
 - [x] Added `apps/web/src/config/firebase.js` with client SDK parameters and env fallbacks.
 - [x] Verified clean production build compilation.
 
-
+### Phase 28: Firebase Hosting Deployment & Live Verification
+- [x] Installed `firebase-tools` in root `devDependencies` and added `deploy:firebase` npm script.
+- [x] Updated `.gitignore` to ignore `.firebase/` deployment artifacts and cache.
+- [x] Rebuilt production distribution bundle via `npm run build -w apps/web`.
+- [x] Successfully deployed to Firebase Hosting via `npx firebase deploy --only hosting`.
+- [x] Verified live deployment status and 200 OK title response at `https://virexo-chat-app.web.app`.
+- [x] Validated monorepo lint and test compliance across workspaces.

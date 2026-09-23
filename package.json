@@ -18,7 +18,8 @@
     "test:api": "npm test -w apps/api",
     "test:web": "npm test -w apps/web",
     "test:e2e": "npx playwright test",
-    "test:ci": "npm run test:api && npm run test:web && npm run build -w apps/web"
+    "test:ci": "npm run test:api && npm run test:web && npm run build -w apps/web",
+    "deploy:firebase": "npm run build -w apps/web && firebase deploy --only hosting"
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",
@@ -26,6 +27,7 @@
     "eslint": "^9.20.1",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^5.1.0",
+    "firebase-tools": "^15.30.2",
     "globals": "^15.15.0",
     "prettier": "^3.5.1"
   }

@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "virexo-chat-app"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }
