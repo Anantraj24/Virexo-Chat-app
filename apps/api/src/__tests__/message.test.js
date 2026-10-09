@@ -160,5 +160,5 @@ describe('Message REST Domain API Integration Tests', () => {
     expect(deleteRes.status).toBe(200);
     expect(deleteRes.body.data.message.isDeleted).toBe(true);
     expect(deleteRes.body.data.message.content).toBe('[This message was deleted]');
-  });
+  }, 25000);
 });

@@ -75,9 +75,14 @@ export function useChat(conversationId, jumpToMessageId = null) {
   }, []);
 
   const loadConversationData = useCallback(async () => {
-    const cid = conversationIdRef.current;
-    const jid = jumpToMessageIdRef.current;
-    if (!cid) return;
+    const cid = conversationId;
+    const jid = jumpToMessageId;
+    if (!cid) {
+      setLoading(false);
+      setConversation(null);
+      setMessages([]);
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -107,7 +112,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
     } finally {
       setLoading(false);
     }
-  }, [addToast]);
+  }, [conversationId, jumpToMessageId, addToast]);
 
   useEffect(() => {
     loadConversationData();
@@ -133,9 +138,9 @@ export function useChat(conversationId, jumpToMessageId = null) {
 
   useEffect(() => {
     const socket = socketClientManager.getSocket();
-    if (!socket) return;
+    if (!socket || !conversationId) return;
 
-    const cid = conversationIdRef.current;
+    const cid = conversationId;
 
     const handleNewMessage = ({ message, conversationId: eventConvId }) => {
       if (eventConvId === cid) {
@@ -148,7 +153,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
       }
     };
 
-    const handleDeletedMessage = ({ messageId, conversationId: eventConvId, deletionScope }) => {
+    const handleDeletedMessage = ({ messageId, conversationId: eventConvId }) => {
       if (eventConvId === cid) {
         setMessages((prev) =>
           prev.map((m) =>
@@ -266,7 +271,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
       socket.off(SOCKET_EVENTS.RECEIPT_UPDATE, handleReceiptUpdate);
       socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, { conversationId: cid });
     };
-  }, [checkIfNearBottom, scrollToBottom]);
+  }, [conversationId, checkIfNearBottom, scrollToBottom]);
 
   const handleLoadEarlier = useCallback(async () => {
     const cid = conversationIdRef.current;
@@ -357,7 +362,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
     if (!content && readyAttachments.length === 0) return;
     if (sending) return;
 
-    const cid = conversationIdRef.current;
+    const cid = conversationId;
     if (!cid) return;
     const idempotencyKey =
       typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString();
@@ -417,7 +422,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
     } finally {
       setSending(false);
     }
-  }, [inputText, sending, currentUser, scrollToBottom, addToast, replyingTo]);
+  }, [inputText, sending, currentUser, scrollToBottom, addToast, replyingTo, pendingAttachments, conversationId]);
 
   const handleRetryMessage = useCallback(async (failedMsg) => {
     const cid = conversationIdRef.current;
@@ -659,7 +664,7 @@ export function useChat(conversationId, jumpToMessageId = null) {
     }
   }, [messages, currentUser, addToast]);
 
-  const handleForwardMessage = useCallback(async (targetConversationId, messageId) => {
+  const handleForwardMessage = useCallback(async () => {
     setForwardingMessage(null);
     addToast({ message: 'Message forwarded', type: 'success' });
   }, [addToast]);

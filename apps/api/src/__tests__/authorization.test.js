@@ -109,7 +109,7 @@ describe('Authorization Matrix Tests', () => {
 
   describe('Non-member → forbidden on conversation operations', () => {
     it('should deny a non-member from sending a message to a conversation', async () => {
-      const { user: owner, token: ownerToken } = await createTestUser({ username: 'conv_owner' });
+      const { user: owner } = await createTestUser({ username: 'conv_owner' });
       const { user: member } = await createTestUser({ username: 'conv_member' });
       const { token: outsiderToken } = await createTestUser({ username: 'outsider' });
 

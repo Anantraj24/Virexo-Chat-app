@@ -1,17 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '../../api/adminApi';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNavigate, Navigate } from 'react-router-dom';
 
 const AdminDashboard = () => {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user } = useAuthStore();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('users');
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -31,14 +31,13 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab]);
 
   useEffect(() => {
     if (user && user.role === 'admin') {
       fetchData();
     }
-  }, [activeTab, user]);
-
+  }, [user, fetchData]);
 
   const handleUserStatus = async (id, currentStatus) => {
     if (!window.confirm(`Are you sure you want to ${currentStatus === 'active' ? 'suspend' : 'restore'} this user?`)) return;
@@ -55,7 +54,7 @@ const AdminDashboard = () => {
     try {
       await adminApi.updateReportStatus(id, newStatus, 'Status updated via admin panel');
       fetchData();
-    } catch (err) {
+    } catch {
       alert('Failed to update report status');
     }
   };

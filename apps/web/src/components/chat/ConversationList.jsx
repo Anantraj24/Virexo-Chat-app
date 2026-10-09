@@ -181,7 +181,10 @@ export function ConversationList({
 
         {/* Sort Filter Row */}
         <div className="flex items-center justify-end pb-1">
-          <button className="flex items-center space-x-1 text-xs text-slate-600 dark:text-zinc-400 font-medium hover:text-slate-900 dark:hover:text-zinc-200 transition">
+          <button 
+            onClick={() => setSortOrder((prev) => (prev === 'Newest' ? 'Oldest' : 'Newest'))}
+            className="flex items-center space-x-1 text-xs text-slate-600 dark:text-zinc-400 font-medium hover:text-slate-900 dark:hover:text-zinc-200 transition"
+          >
             <ArrowUpDown className="w-3 h-3 text-slate-400" />
             <span>{sortOrder}</span>
             <ChevronDown className="w-3 h-3 text-slate-400" />

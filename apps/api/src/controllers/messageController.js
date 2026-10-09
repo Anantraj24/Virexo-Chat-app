@@ -505,7 +505,7 @@ export async function deleteMessageForEveryone(req, res, next) {
     const { id } = req.params;
     const currentUserId = req.user.id || req.user.id;
 
-    const { message, conversation, member } = await verifyMessageAccess(id, currentUserId);
+    const { message, member } = await verifyMessageAccess(id, currentUserId);
 
     const isSender = message.senderId === currentUserId;
     const isOwner = member.role === 'owner';
@@ -757,7 +757,7 @@ export async function removeReaction(req, res, next) {
       throw new BadRequestError('Emoji is required', 'INVALID_EMOJI');
     }
 
-    const { message, conversation } = await verifyMessageAccess(id, currentUserId);
+    const { conversation } = await verifyMessageAccess(id, currentUserId);
 
     const existingReaction = await prisma.reaction.findUnique({
       where: {

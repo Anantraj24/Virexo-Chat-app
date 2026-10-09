@@ -375,7 +375,7 @@ export async function removeMember(req, res, next) {
     // Force user's sockets to leave the conversation room
     try {
       getIO().in(`user:${userId}`).socketsLeave(`conversation:${id}`);
-    } catch (e) {
+    } catch {
       // Ignore socket errors in test mode
     }
 
@@ -505,7 +505,7 @@ export async function leaveGroup(req, res, next) {
     // Force user's sockets to leave the conversation room
     try {
       getIO().in(`user:${currentUserId}`).socketsLeave(`conversation:${id}`);
-    } catch (e) {
+    } catch {
       // Ignore socket errors in test mode
     }
 

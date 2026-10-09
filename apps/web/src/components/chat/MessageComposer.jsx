@@ -11,8 +11,7 @@ import {
   Mic, 
   Square, 
   Trash2, 
-  Video,
-  Smile
+  Video
 } from 'lucide-react';
 
 export function MessageComposer({

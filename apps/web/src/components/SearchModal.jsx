@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
@@ -6,11 +6,7 @@ import {
   MessageSquare, 
   Users, 
   Hash, 
-  Loader2, 
-  FileText, 
-  Image as ImageIcon, 
-  Video, 
-  Mic 
+  Loader2 
 } from 'lucide-react';
 import { apiClient as api } from '../api/axiosClient';
 import { useAuthStore } from '../store/useAuthStore';

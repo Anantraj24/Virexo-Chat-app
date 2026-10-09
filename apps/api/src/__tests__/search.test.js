@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import app from '../app.js';
-import { setupTestDB, teardownTestDB, cleanCollections, prisma } from './testSetup.js';
+import { setupTestDB, teardownTestDB, cleanCollections } from './testSetup.js';
 
 beforeAll(async () => {
   await setupTestDB();
@@ -16,11 +16,6 @@ beforeEach(async () => {
 });
 
 describe('Search API Security Integration Tests', () => {
-  const testUser = {
-    username: 'search_tester',
-    email: 'tester@example.com',
-    password: 'Password123!',
-  };
 
   async function getAuthToken() {
     const unique = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;

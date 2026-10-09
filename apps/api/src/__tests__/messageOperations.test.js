@@ -2,7 +2,6 @@ import request from 'supertest';
 import { describe, it, expect, beforeEach, vi, afterEach, beforeAll, afterAll } from 'vitest';
 import app from '../app.js';
 import { setupTestDB, teardownTestDB, cleanCollections, prisma, createTestUser } from './testSetup.js';
-import { generateAccessToken } from '../utils/token.js';
 
 vi.mock('../utils/socket.js', () => ({
   getIO: vi.fn(() => ({
@@ -12,7 +11,7 @@ vi.mock('../utils/socket.js', () => ({
 }));
 
 describe('Message Operations API', () => {
-  let user1, user2, user3, token1, token2, token3, conversation, message;
+  let user1, user2, user3, token1, token2, conversation, message;
   
   // Vitest handles mongoose connection if run globally, 
   // but if needed we can add it. The other tests have it inside the file.
@@ -38,7 +37,7 @@ describe('Message Operations API', () => {
 
     const u2 = await createTestUser(); user2 = u2.user; token2 = u2.token;
 
-    const u3 = await createTestUser(); user3 = u3.user; token3 = u3.token;
+    const u3 = await createTestUser(); user3 = u3.user;
 
     conversation = await prisma.conversation.create({ data: {
       type: 'direct',

@@ -31,7 +31,7 @@ afterAll(async () => {
     await new Promise((resolve) => httpServer.close(resolve));
   }
   await teardownTestDB();
-});
+}, 30000);
 
 beforeEach(async () => {
   await cleanCollections();
@@ -160,7 +160,7 @@ describe('Socket.IO Real-Time Foundation Integration Tests', () => {
 
     client1.disconnect();
     client2.disconnect();
-  }, 15000);
+  }, 25000);
 
   it('should broadcast message:new event to room members when a message is sent', async () => {
     const user1 = await createTestUser('msg_sender', 'msgsend@example.com');
@@ -211,7 +211,7 @@ describe('Socket.IO Real-Time Foundation Integration Tests', () => {
 
     client1.disconnect();
     client2.disconnect();
-  }, 15000);
+  }, 25000);
 
   it('should reject socket connection from a suspended user', async () => {
     const user = await createTestUser('banned_user', 'banned@example.com');

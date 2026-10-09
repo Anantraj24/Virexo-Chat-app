@@ -5,8 +5,7 @@ import { useToast } from '../components/ui/Toast';
 import { listConversationsRequest } from '../api/conversationApi';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
-import { Hash, MessageSquare, Plus, Search, ArrowLeft } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { Hash, MessageSquare, Search } from 'lucide-react';
 
 export function ConversationListPage() {
   const { user } = useAuthStore();
@@ -32,9 +31,6 @@ export function ConversationListPage() {
   useEffect(() => {
     fetchConversations();
   }, [fetchConversations]);
-
-  const channels = conversations.filter((c) => c.type === 'group' || c.type === 'channel');
-  const directMessages = conversations.filter((c) => c.type === 'direct');
 
   const getDMRecipient = (conv) => {
     const otherMember = conv.members?.find((m) => {

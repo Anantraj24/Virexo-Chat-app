@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import app from '../app.js';
-import { setupTestDB, teardownTestDB, cleanCollections, prisma } from './testSetup.js';
+import { setupTestDB, teardownTestDB, cleanCollections } from './testSetup.js';
 
 beforeAll(async () => {
   await setupTestDB();

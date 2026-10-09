@@ -6,14 +6,8 @@ import { Avatar } from '../ui/Avatar';
 import { MessageStatus } from './MessageStatus';
 import { DateSeparator } from './DateSeparator';
 import { MessageActionMenu } from './MessageActionMenu';
-import { FileText, Image as ImageIcon, Film, Download } from 'lucide-react';
+import { FileText, Download } from 'lucide-react';
 import { cn } from '../../lib/utils';
-
-const MESSAGE_GROUP_GAP_MS = 120000;
-
-function formatMessageTime(timestamp) {
-  return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
 
 function isSameDay(date1, date2) {
   return date1.toDateString() === date2.toDateString();

@@ -6,7 +6,6 @@ import { listConversationsRequest } from '../../api/conversationApi';
 import { forwardMessageRequest } from '../../api/messageApi';
 import { useToast } from '../ui/Toast';
 import { useAuthStore } from '../../store/useAuthStore';
-import { cn } from '../../lib/utils';
 
 export function ForwardMessageModal({ isOpen, onClose, message }) {
   const [conversations, setConversations] = useState([]);

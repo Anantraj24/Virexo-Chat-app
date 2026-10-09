@@ -25,7 +25,7 @@ export const isDBConnected = async () => {
     // Simple query to verify connection
     await prisma.$queryRaw`SELECT 1`;
     return true;
-  } catch (err) {
+  } catch {
     return false;
   }
 };

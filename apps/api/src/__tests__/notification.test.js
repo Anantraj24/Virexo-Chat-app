@@ -113,8 +113,8 @@ describe('Notification API Integration Tests', () => {
   });
 
   it('should not return notifications belonging to other users', async () => {
-    const { user: user1, token: token1 } = await createTestUser({ username: 'owner_user' });
-    const { user: user2, token: token2 } = await createTestUser({ username: 'other_user' });
+    const { user: user1 } = await createTestUser({ username: 'owner_user' });
+    const { token: token2 } = await createTestUser({ username: 'other_user' });
     const { user: actor } = await createTestUser({ username: 'notif_actor' });
 
     await seedNotifications(user1.id, actor.id, 3);

@@ -1,7 +1,7 @@
 # Virexo Build Status & Progress Tracker
 
-- **Current Phase**: **Phase 30 - Session Lifecycle & Guest Auth UX Refinement**
-- **Overall Status**: Distinguishes unauthenticated guest visits from genuine expired sessions in Axios response interceptor, deployed to Firebase Hosting, and verified across monorepo tests.
+- **Current Phase**: **Phase 31 - Chat Flow Smooth Working & Monorepo QA**
+- **Overall Status**: Resolved infinite loading skeleton in useChat on empty/home routes, fixed channel/DM route reactivity and room switching, cleared all 54 ESLint problems (0 errors, 0 warnings), stabilized integration test timeouts for remote Neon Postgres (188/188 tests passing across monorepo), and verified clean multi-workspace production builds.
 - **Monorepo Readiness**: Active Workspaces (`apps/web`, `apps/api`, `packages/shared`)
 
 ---
@@ -40,6 +40,7 @@
 | **Phase 28** | **Firebase Hosting Deployment & Live Verification** | Deployed production Vite bundle to Firebase Hosting (`https://virexo-chat-app.web.app`), verified 200 OK. | **COMPLETE** |
 | **Phase 29** | **Production API Blueprint & Multi-Origin Connection** | Render IaC blueprint (`render.yaml`), multi-origin CORS & Socket.IO config, Neon Postgres env validation, cookie sameSite alignment. | **COMPLETE** |
 | **Phase 30** | **Session Lifecycle & Guest Auth UX Refinement** | Differentiated unauthenticated guest state from expired sessions, prevented misleading error toasts, redeployed to Firebase Hosting. | **COMPLETE** |
+| **Phase 31** | **Chat Flow Smooth Working & Monorepo QA** | Reactivity fix for useChat hook & route transitions, zero ESLint issues, 100% test pass rate across API and Web, clean production builds. | **COMPLETE** |
 
 ---
 
@@ -275,3 +276,13 @@
 - [x] Verified login with credentials `anant` / `anant123` setting HttpOnly `refreshToken` cookie.
 - [x] Verified 63/63 web unit tests passing and 0 ESLint errors.
 - [x] Recompiled production distribution and redeployed to live Firebase Hosting (`https://virexo-chat-app.web.app`).
+
+### Phase 31: Chat Flow Smooth Working & Monorepo QA
+- [x] Resolved infinite loading skeleton bug in `apps/web/src/hooks/useChat.js` when `conversationId` is undefined or null (such as landing on `/` route).
+- [x] Fixed conversation switching reactivity by synchronizing room join/leave effects and data re-fetch directly with `conversationId` changes.
+- [x] Isolated chat state across routes by adding keyed instances (`key={id}`) to `ChannelPage.jsx`, `DirectMessagePage.jsx`, and `HomePage.jsx`.
+- [x] Implemented interactive sort toggle (`Newest` / `Oldest`) in `ConversationList.jsx`.
+- [x] Resolved all 54 ESLint warnings across web and API workspaces; `npm run lint` exits cleanly with 0 errors and 0 warnings.
+- [x] Adjusted integration test timeouts for remote Neon PostgreSQL in `message.test.js` and `socket.test.js`, achieving 100% test pass rate (188/188 tests: 125 API + 63 Web).
+- [x] Verified production builds across all three monorepo workspaces (`@virexo/web`, `@virexo/api`, `@virexo/shared`).
+

@@ -1,5 +1,7 @@
+import { useParams } from 'react-router-dom';
 import { ChatLayout } from '../components/ChatLayout';
 
 export function DirectMessagePage() {
-  return <ChatLayout />;
+  const { id } = useParams();
+  return <ChatLayout key={id} />;
 }

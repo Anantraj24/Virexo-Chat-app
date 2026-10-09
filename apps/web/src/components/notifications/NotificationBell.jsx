@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Bell, Check, CheckCheck } from 'lucide-react';
 import { useNotificationStore } from '../../store/useNotificationStore';
 import { getNotificationsRequest, markNotificationAsReadRequest, markAllNotificationsAsReadRequest } from '../../api/notificationApi';
@@ -9,12 +9,12 @@ import { cn } from '../../lib/utils';
 import { Dropdown } from '../ui/Dropdown';
 
 export function NotificationBell() {
-  const { unreadCount, notifications, setNotifications, setPagination, appendNotifications, markAsReadLocally, markAllAsReadLocally, hasNextPage, nextCursor } = useNotificationStore();
+  const { unreadCount, notifications, setNotifications, setPagination, markAsReadLocally, markAllAsReadLocally } = useNotificationStore();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
 
-  const fetchInitial = async () => {
+  const fetchInitial = useCallback(async () => {
     setLoading(true);
     try {
       const res = await getNotificationsRequest();
@@ -25,13 +25,13 @@ export function NotificationBell() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [setNotifications, setPagination]);
 
   useEffect(() => {
     if (isOpen && notifications.length === 0 && !loading) {
       fetchInitial();
     }
-  }, [isOpen]);
+  }, [isOpen, notifications.length, loading, fetchInitial]);
 
   const handleMarkAllRead = async () => {
     try {

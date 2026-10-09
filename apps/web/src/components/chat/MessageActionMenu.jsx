@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { Edit2, Trash2, Reply, Forward, Pin, PinOff, Smile, XCircle, MoreVertical } from 'lucide-react';
-import { cn } from '../../lib/utils';
 
 export function MessageActionMenu({ message, currentUser, onEdit, onDelete, onDeleteForEveryone, onReply, onPin, onUnpin, onReaction, onForward, onReport }) {
   const [isOpen, setIsOpen] = useState(false);

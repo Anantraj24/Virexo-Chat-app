@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { usePreferencesStore } from '../store/usePreferencesStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useToast } from '../components/ui/Toast';
@@ -45,7 +45,6 @@ export function AppLayout() {
   const { user, clearAuth } = useAuthStore();
   const { addToast } = useToast();
   const navigate = useNavigate();
-  const location = useLocation();
 
   useGlobalSocket();
 
